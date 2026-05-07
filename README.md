@@ -93,8 +93,8 @@ Unipool enables:
 
 | Sprint | Dates | Focus |
 |--------|-------|-------|
-| Sprint 1 | 20 Apr – 4 May | Auth, driver verification, core ride-hailing |
-| Sprint 2 | 4 May – 18 May | Shared rides |
+| Sprint 1 | 20 Apr – 4 May | Auth, driver verification, Shared rides |
+| Sprint 2 | 4 May – 18 May | Ride hailing |
 | Sprint 3 | 18 May – 1 Jun | Delivery workflow |
 | Sprint 4 | 1 Jun – 15 Jun | Earnings, disputes, admin moderation, history |
 
