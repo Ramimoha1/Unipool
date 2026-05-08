@@ -1,6 +1,26 @@
+import 'package:firebase_core/firebase_core.dart'; 
 import 'package:flutter/material.dart';
+import 'firebase_options.dart'; 
 
-void main() {
+void main() async {
+  // Required to ensure Flutter framework is ready before Firebase starts
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initializes Firebase for the specific platform (Android, iOS, or Web)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  //This code block is to test firebase connection
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print("Firebase Initialized successfully");
+  } catch (e) {
+    print("Firebase Initialization failed: $e");
+  }
+
   runApp(const MainApp());
 }
 
@@ -12,7 +32,7 @@ class MainApp extends StatelessWidget {
     return const MaterialApp(
       home: Scaffold(
         body: Center(
-          child: Text('Hello World!'),
+          child: Text('UniPool Firebase Initialized!'),
         ),
       ),
     );
