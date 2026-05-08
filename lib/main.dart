@@ -11,6 +11,16 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  //This code block is to test firebase connection
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print("Firebase Initialized successfully");
+  } catch (e) {
+    print("Firebase Initialization failed: $e");
+  }
+
   runApp(const MainApp());
 }
 
