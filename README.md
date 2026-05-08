@@ -101,3 +101,75 @@ Unipool enables:
 ---
 
 *Project tracked on Jira under the HUS board.*
+
+---
+
+# 📂 Firebase Local Setup Guide
+
+This guide ensures every contributor has a consistent environment and can run the **Unipool** application on their local machine.
+
+## 1. Prerequisites
+
+Before starting, ensure you have the following installed:
+
+* **Node.js** (required for Firebase tools).
+* **Firebase CLI**: Install by running `npm install -g firebase-tools`.
+* **FlutterFire CLI**: Install by running `dart pub global activate flutterfire_cli`.
+* **Flutter SDK**: Ensure your environment is ready for Flutter development.
+
+## 2. Authentication
+
+Log in to the Google account associated with the project:
+
+```bash
+firebase login
+
+```
+
+## 3. Local Project Configuration
+
+You must link your local codebase to the Firebase project to generate the required platform-specific configurations.
+
+1. From the project root, run:
+```bash
+flutterfire configure
+
+```
+
+
+2. Select the `hustly` (or `unipool`) project from the list.
+3. Select the following platforms when prompted: `android`, `ios`, and `web`.
+4. This command will generate `lib/firebase_options.dart`. **Do not modify this file manually**.
+
+## 4. Initialization & Dependencies
+
+Fetch the latest packages and prepare the build:
+
+```bash
+flutter pub get
+
+```
+
+*Note: If VS Code prompts you to "synchronize Java classpath/configuration" after the configuration, select **Yes** to ensure the Android build files are correctly mapped.*
+
+## 5. Architectural Guidelines
+
+As per our project setup, please follow these rules when developing features:
+
+* **Configuration Location**: `firebase_options.dart` stays at the root of the `lib/` folder.
+* **Service Wrappers**: Any general Firebase helpers should go into `lib/core/services` or `lib/core/firebase`.
+* **Feature-Specific Logic**: Keep Firestore logic (queries, data mapping) inside the relevant feature folder (e.g., `lib/features/auth`) rather than one global file.
+* **Database Schema**: Refer to `docs/firebase_schema.md` for the official collection and field structures.
+
+## 6. How to Run
+
+Once setup is complete, you can launch the app:
+
+* **Mobile**: `flutter run`
+* **Web**: `flutter run -d chrome`
+
+---
+
+### Pro-Tip for the Team
+
+Since we are currently in **Sprint 1**, our focus is on **Authentication**, **Driver Verification**, and **Shared Rides**. Completing this setup is the first step toward building the user registration flow and the `users` collection in Firestore.
