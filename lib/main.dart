@@ -1,26 +1,13 @@
-import 'package:firebase_core/firebase_core.dart'; 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'firebase_options.dart'; 
+import 'firebase_options.dart';
+import 'features/profile/presentation/profile_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
-  // Required to ensure Flutter framework is ready before Firebase starts
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initializes Firebase for the specific platform (Android, iOS, or Web)
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  //This code block is to test firebase connection
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print("Firebase Initialized successfully");
-  } catch (e) {
-    print("Firebase Initialization failed: $e");
-  }
-
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FirebaseAuth.instance.signInAnonymously();
   runApp(const MainApp());
 }
 
@@ -29,12 +16,19 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('UniPool Firebase Initialized!'),
+    return MaterialApp(
+      title: 'UniPool',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1A9B8A),
+          brightness: Brightness.light,
         ),
+        useMaterial3: true,
+        fontFamily: 'Roboto',
       ),
+      // In a real app this would be replaced by your router (go_router, etc.)
+      home: const ProfileScreen(),
     );
   }
 }
