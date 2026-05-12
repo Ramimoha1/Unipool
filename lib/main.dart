@@ -1,8 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'firebase_options.dart';
-import 'features/profile/presentation/profile_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
+import 'package:unipool/features/admin/presentation/admin_dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,18 +17,15 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'UniPool',
+      title: 'UniPool Admin Test',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A9B8A),
-          brightness: Brightness.light,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A9B8A)),
         useMaterial3: true,
-        fontFamily: 'Roboto',
       ),
-      // In a real app this would be replaced by your router (go_router, etc.)
-      home: const ProfileScreen(),
+      // If the error persists here, Ctrl+Click the import above 
+      // to see if it actually opens the file.
+      home: const AdminDashboardScreen(), 
     );
   }
 }
