@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'package:unipool/features/admin/presentation/admin_dashboard_screen.dart';
+import 'package:unipool/features/profile/presentation/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,7 @@ class MainApp extends StatelessWidget {
       ),
       // If the error persists here, Ctrl+Click the import above 
       // to see if it actually opens the file.
-      home: const AdminDashboardScreen(), 
+      home: const ProfileScreen(), 
     );
   }
 }

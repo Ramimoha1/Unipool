@@ -153,7 +153,7 @@ class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
             const SizedBox(height: 10),
             _UploadCard(
               label: 'Upload your matric card',
-              hint: 'JPG, PNG (Max 5MB)',
+              hint: 'JPG, PNG (Max 2MB)',
               fileName: _studentCardName,
               onChoose: () => _pickFile(true),
             ),
@@ -162,7 +162,7 @@ class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
             const SizedBox(height: 10),
             _UploadCard(
               label: "Upload your driver's license",
-              hint: 'JPG, PNG (Max 5MB)',
+              hint: 'JPG, PNG (Max 2MB)',
               fileName: _driverLicenseName,
               onChoose: () => _pickFile(false),
             ),
