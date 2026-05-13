@@ -4,9 +4,6 @@ import '../data/auth_repository.dart';
 import 'main_authentication_screen.dart';
 import 'package:unipool/features/profile/presentation/profile_screen.dart';
 import 'package:unipool/features/admin/presentation/admin_dashboard_screen.dart';
-// Import your post-login screens here:
-// import 'package:unipool/features/admin/presentation/admin_dashboard_screen.dart';
-// import 'package:unipool/features/home/presentation/home_screen.dart';
 
 /// [AuthGate] sits at the root of the widget tree and listens to Firebase
 /// auth state. It routes the user to the correct screen automatically:
@@ -70,45 +67,6 @@ class _SplashScreen extends StatelessWidget {
       backgroundColor: Color(0xFF1A9B8A),
       body: Center(
         child: CircularProgressIndicator(color: Colors.white),
-      ),
-    );
-  }
-}
-
-// ─── Placeholder (remove when real screens are wired up) ─────────────────────
-
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: color,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => AuthRepository().signOut(),
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.white24,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Sign Out'),
-            ),
-          ],
-        ),
       ),
     );
   }

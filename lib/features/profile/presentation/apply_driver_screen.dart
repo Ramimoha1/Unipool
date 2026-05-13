@@ -16,11 +16,6 @@ class ApplyDriverScreen extends StatefulWidget {
 class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
   // ─── Constants ───────────────────────────────────────────────────────────
   static const Color _teal = Color(0xFF1A9B8A);
-  static const Color _tealLight = Color(0xFFE8F7F5);
-  static const Color _amber = Color(0xFFFFC107);
-  static const Color _textDark = Color(0xFF1A2332);
-  static const Color _textMuted = Color(0xFF8A96A3);
-  static const Color _border = Color(0xFFE5EAF0);
   static const Color _bgPage = Color(0xFFF7F9FC);
 
   // ─── State ───────────────────────────────────────────────────────────────
@@ -175,7 +170,7 @@ class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _teal,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: _teal.withOpacity(0.5),
+                  disabledBackgroundColor: _teal.withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -210,8 +205,6 @@ class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
 // ─── Sub-widgets ─────────────────────────────────────────────────────────────
 
 class _InfoBanner extends StatelessWidget {
-  static const Color _teal = Color(0xFF1A9B8A);
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -276,12 +269,12 @@ class _UploadCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: fileName != null ? _teal.withOpacity(0.5) : _border,
+          color: fileName != null ? _teal.withValues(alpha: 0.5) : _border,
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

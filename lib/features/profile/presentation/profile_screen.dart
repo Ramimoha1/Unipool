@@ -14,16 +14,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   // ─── Constants ───────────────────────────────────────────────────────────
   static const Color _teal = Color(0xFF1A9B8A);
-  static const Color _tealLight = Color(0xFFE8F7F5);
-  static const Color _amber = Color(0xFFFFC107);
-  static const Color _amberLight = Color(0xFFFFF8E1);
-  static const Color _red = Color(0xFFE53935);
-  static const Color _redLight = Color(0xFFFFEBEE);
-  static const Color _green = Color(0xFF2E7D32);
-  static const Color _greenLight = Color(0xFFE8F5E9);
-  static const Color _textDark = Color(0xFF1A2332);
-  static const Color _textMuted = Color(0xFF8A96A3);
-  static const Color _border = Color(0xFFE5EAF0);
   static const Color _bgPage = Color(0xFFF7F9FC);
 
   final _repo = DriverVerificationRepository(
@@ -131,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               CircleAvatar(
                 radius: 36,
-                backgroundColor: Colors.white.withOpacity(0.25),
+                backgroundColor: Colors.white.withValues(alpha: 0.25),
                 child: Text(
                   _initials(fullName),
                   style: const TextStyle(
@@ -219,7 +209,7 @@ class _StatusBadge extends StatelessWidget {
         ),
       _ => (
           'Not Verified',
-          Colors.white.withOpacity(0.2),
+          Colors.white.withValues(alpha: 0.2),
           Colors.white,
           Icons.info_outline
         ),
@@ -272,7 +262,7 @@ class _StatsRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -356,7 +346,7 @@ class _DriverStatusCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -490,7 +480,7 @@ class _QuickActionsCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -558,7 +548,7 @@ class _ActionRow extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
+                    color: iconColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(icon, color: iconColor, size: 18),
@@ -585,7 +575,6 @@ class _ActionRow extends StatelessWidget {
     );
   }
 }
-
 // ─── Bottom Navigation ────────────────────────────────────────────────────────
 
 class _BottomNav extends StatelessWidget {
@@ -626,3 +615,4 @@ class _BottomNav extends StatelessWidget {
     );
   }
 }
+
