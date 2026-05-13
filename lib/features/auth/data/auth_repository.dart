@@ -103,6 +103,16 @@ class AuthRepository {
     // Verify admin role in Firestore
     final doc = await _firestore.collection('users').doc(user.uid).get();
     final data = doc.data();
+
+    // ADD THIS — print to debug console
+  print('=== ADMIN DEBUG ===');
+  print('Auth UID: ${user.uid}');
+  print('Doc exists: ${doc.exists}');
+  print('Doc data: $data');
+  print('userType value: ${data?['userType']}');
+  print('==================');
+
+
     if (data == null || data['userType'] != 'admin') {
       await _auth.signOut();
       throw Exception('Access denied. This account does not have admin privileges.');

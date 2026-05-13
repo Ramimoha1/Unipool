@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../data/auth_repository.dart';
 import 'main_authentication_screen.dart';
+import 'package:unipool/features/profile/presentation/profile_screen.dart';
+import 'package:unipool/features/admin/presentation/admin_dashboard_screen.dart';
 // Import your post-login screens here:
 // import 'package:unipool/features/admin/presentation/admin_dashboard_screen.dart';
 // import 'package:unipool/features/home/presentation/home_screen.dart';
@@ -45,19 +47,11 @@ class AuthGate extends StatelessWidget {
             final userType = typeSnapshot.data ?? 'student';
 
             if (userType == 'admin') {
-              // TODO: replace with AdminDashboardScreen() once imported
-              return const _PlaceholderScreen(
-                label: 'Admin Dashboard',
-                color: Color(0xFFD32F2F),
-              );
+              return const AdminDashboardScreen();
             }
 
             // Default: student / driver / driver_candidate
-            // TODO: replace with HomeScreen() or your main tab navigator
-            return const _PlaceholderScreen(
-              label: 'Student Home',
-              color: Color(0xFF1A9B8A),
-            );
+            return const ProfileScreen();
           },
         );
       },
