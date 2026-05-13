@@ -118,6 +118,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(Icons.settings_outlined, color: Colors.white),
           onPressed: () {},
         ),
+        IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: () => FirebaseAuth.instance.signOut(),
+          ),
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
