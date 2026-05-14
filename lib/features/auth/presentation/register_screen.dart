@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../data/auth_repository.dart';
@@ -16,6 +15,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   // ─── Constants ───────────────────────────────────────────────────────────
   static const Color _teal = Color(0xFF1A9B8A);
+  static const Color _border = Color(0xFFE5EAF0);
   static const Color _textDark = Color(0xFF1A2332);
   static const Color _textMuted = Color(0xFF9CA3AF);
   static const Color _errorRed = Color(0xFFDC2626);
@@ -29,7 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
 
-  File? _matricCardFile;
+  XFile? _matricCardFile;
   String? _matricCardName;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -59,7 +59,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (picked == null) return;
     setState(() {
-      _matricCardFile = File(picked.path);
+      _matricCardFile = picked;
       _matricCardName = picked.name;
     });
   }
@@ -203,7 +203,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _FieldLabel('University'),
                 _InputField(
                   controller: _universityCtrl,
-                  hint: 'e.g., Universiti Putra Malaysia',
+                  hint: 'e.g., Universiti Teknologi Malaysia',
                   prefixIcon: Icons.school_outlined,
                   validator: (v) => _validateRequired(v, 'University'),
                   textCapitalization: TextCapitalization.words,
@@ -282,7 +282,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _teal,
-                      disabledBackgroundColor: _teal.withValues(alpha: 0.6),
+                      disabledBackgroundColor: _teal.withOpacity(0.6),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

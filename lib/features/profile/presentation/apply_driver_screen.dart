@@ -1,10 +1,9 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import '../data/driver_verification_repository.dart';
 import 'package:image_picker/image_picker.dart';
+import '../data/driver_verification_repository.dart';
 
 class ApplyDriverScreen extends StatefulWidget {
   const ApplyDriverScreen({super.key});
@@ -19,8 +18,9 @@ class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
   static const Color _bgPage = Color(0xFFF7F9FC);
 
   // ─── State ───────────────────────────────────────────────────────────────
-  File? _studentCardFile;
-  File? _driverLicenseFile;
+  // XFile works on web AND mobile — no dart:io File needed
+  XFile? _studentCardFile;
+  XFile? _driverLicenseFile;
   bool _isSubmitting = false;
   String? _studentCardName;
   String? _driverLicenseName;
@@ -30,15 +30,9 @@ class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
     storage: FirebaseStorage.instance,
   );
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
+  // ─── Pick File ────────────────────────────────────────────────────────────
 
-  /// Opens a simple file picker dialog that lets the user pick a JPG or PNG
-  /// from the device gallery.  In a real project replace this body with
-  /// `image_picker` calls – the signature stays the same.
   Future<void> _pickFile(bool isStudentCard) async {
-    // ── REAL IMPLEMENTATION ──────────────────────────────────────────────
-    // Uncomment the block below and add image_picker to pubspec.yaml.
-    //
     final picker = ImagePicker();
     final XFile? picked = await picker.pickImage(
       source: ImageSource.gallery,
@@ -46,24 +40,19 @@ class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
       maxWidth: 1920,
     );
     if (picked == null) return;
-    final file = File(picked.path);
+
     setState(() {
       if (isStudentCard) {
-        _studentCardFile = file;
+        _studentCardFile = picked;
         _studentCardName = picked.name;
       } else {
-        _driverLicenseFile = file;
+        _driverLicenseFile = picked;
         _driverLicenseName = picked.name;
       }
     });
-    // ─────────────────────────────────────────────────────────────────────
-
-    // STUB: show a snackbar until image_picker is wired up.
-    // _showSnack(
-    //   'Add image_picker to pubspec.yaml and uncomment _pickFile body.',
-    //   isError: false,
-    // );
   }
+
+  // ─── Submit ───────────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
     if (_studentCardFile == null || _driverLicenseFile == null) {
@@ -98,7 +87,10 @@ class _ApplyDriverScreenState extends State<ApplyDriverScreen> {
       );
 
       if (!mounted) return;
-      _showSnack('Application submitted! We\'ll review it within 24–48 hours.', isError: false);
+      _showSnack(
+        'Application submitted! We\'ll review it within 24–48 hours.',
+        isError: false,
+      );
       Navigator.of(context).pop(true); // pop with `true` so Profile refreshes
     } catch (e) {
       _showSnack(e.toString());
@@ -294,14 +286,16 @@ class _UploadCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 13.5,
               color: fileName != null ? _teal : const Color(0xFF4A5568),
-              fontWeight: fileName != null ? FontWeight.w500 : FontWeight.normal,
+              fontWeight:
+                  fileName != null ? FontWeight.w500 : FontWeight.normal,
             ),
           ),
           if (fileName == null) ...[
             const SizedBox(height: 4),
             Text(
               hint,
-              style: const TextStyle(fontSize: 11.5, color: Color(0xFF8A96A3)),
+              style:
+                  const TextStyle(fontSize: 11.5, color: Color(0xFF8A96A3)),
             ),
           ],
           const SizedBox(height: 16),
@@ -320,7 +314,8 @@ class _UploadCard extends StatelessWidget {
               ),
               child: Text(
                 fileName != null ? 'Change File' : 'Choose File',
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w500),
               ),
             ),
           ),

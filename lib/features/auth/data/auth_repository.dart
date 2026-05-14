@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AuthRepository {
   final FirebaseAuth _auth;
@@ -33,7 +33,7 @@ class AuthRepository {
     required String password,
     required String university,
     required String matricNumber,
-    File? matricCardFile,
+    XFile? matricCardFile,
   }) async {
     // 1. Create Firebase Auth account
     final credential = await _auth.createUserWithEmailAndPassword(
@@ -60,13 +60,12 @@ class AuthRepository {
       'fullName': fullName.trim(),
       'email': email.trim().toLowerCase(),
       'phoneNumber': '',
-      'userType': 'student',
       'roles': ['student'],
       'matricNumber': matricNumber.trim(),
       'university': university.trim(),
       'matricCardUrl': matricCardUrl,
       'profilePhotoUrl': null,
-      'verificationStatus': matricCardFile != null ? 'pending' : 'unverified',
+      'verificationStatus': 'unverified',
       'isActive': true,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -89,7 +88,7 @@ class AuthRepository {
     return credential.user!;
   }
 
-  /// Signs in as admin. Verifies the user has `userType == 'admin'` in Firestore.
+  /// Signs in as admin. Verifies the user has `'admin'` in their `roles` array in Firestore.
   Future<User> signInAsAdmin({
     required String email,
     required String password,
@@ -103,8 +102,8 @@ class AuthRepository {
     // Verify admin role in Firestore
     final doc = await _firestore.collection('users').doc(user.uid).get();
     final data = doc.data();
-
-    if (data == null || data['userType'] != 'admin') {
+    final roles = (data?['roles'] as List<dynamic>?)?.cast<String>() ?? [];
+    if (data == null || !roles.contains('admin')) {
       await _auth.signOut();
       throw Exception('Access denied. This account does not have admin privileges.');
     }
@@ -122,25 +121,28 @@ class AuthRepository {
 
   Future<void> signOut() => _auth.signOut();
 
-  // ─── User Type Lookup ─────────────────────────────────────────────────────
+  // ─── Roles Lookup ─────────────────────────────────────────────────────────
 
-  /// Returns the userType for the given uid from Firestore.
-  Future<String?> getUserType(String uid) async {
+  /// Returns the roles list for the given uid from Firestore.
+  Future<List<String>> getUserRoles(String uid) async {
     final doc = await _firestore.collection('users').doc(uid).get();
-    return doc.data()?['userType'] as String?;
+    final roles = (doc.data()?['roles'] as List<dynamic>?)?.cast<String>() ?? [];
+    return roles;
   }
 
   // ─── Private Helpers ──────────────────────────────────────────────────────
 
   Future<String> _uploadMatricCard({
     required String userId,
-    required File file,
+    required XFile file,
   }) async {
-    final ext = file.path.split('.').last;
+    final bytes = await file.readAsBytes();
+    final mimeType = file.mimeType ?? 'image/jpeg';
+    final ext = file.name.split('.').last.toLowerCase();
     final ref = _storage
         .ref()
         .child('matric_cards/$userId/matric_card_${DateTime.now().millisecondsSinceEpoch}.$ext');
-    final task = await ref.putFile(file);
+    final task = await ref.putData(bytes, SettableMetadata(contentType: mimeType));
     return task.ref.getDownloadURL();
   }
 }

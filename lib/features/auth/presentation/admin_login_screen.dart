@@ -45,7 +45,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         email: _emailCtrl.text,
         password: _passwordCtrl.text,
       );
-      // AuthGate will detect userType == 'admin' and route to AdminDashboardScreen.
+      // AuthGate will detect 'admin' in roles and route to AdminDashboardScreen.
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
     } on Exception catch (e) {

@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import '../domain/driver_application.dart';
 
 class DriverVerificationRepository {
@@ -14,17 +14,26 @@ class DriverVerificationRepository {
         _storage = storage ?? FirebaseStorage.instance;
 
   /// Upload a document image to Firebase Storage.
+  /// Uses [XFile.readAsBytes] so it works on web AND mobile.
   /// Returns the download URL.
   Future<String> uploadDocument({
     required String userId,
-    required File file,
+    required XFile file,
     required String docType, // 'student_card' or 'driver_license'
   }) async {
-    final ext = file.path.split('.').last;
+    final bytes = await file.readAsBytes();
+    final mimeType = file.mimeType ?? 'image/jpeg';
+    final ext = file.name.split('.').last.toLowerCase();
+
     final ref = _storage
         .ref()
-        .child('verification_docs/$userId/${docType}_${DateTime.now().millisecondsSinceEpoch}.$ext');
-    final task = await ref.putFile(file);
+        .child(
+            'verification_docs/$userId/${docType}_${DateTime.now().millisecondsSinceEpoch}.$ext');
+
+    final task = await ref.putData(
+      bytes,
+      SettableMetadata(contentType: mimeType),
+    );
     return task.ref.getDownloadURL();
   }
 
@@ -61,7 +70,7 @@ class DriverVerificationRepository {
     // Update the user's verificationStatus to reflect a pending review.
     await _firestore.collection('users').doc(userId).update({
       'verificationStatus': 'pending',
-      'userType': 'driver_candidate',
+      'roles': FieldValue.arrayUnion(['driver_candidate']),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

@@ -143,17 +143,35 @@ class _ApplicationCardState extends State<_ApplicationCard> {
         },
       );
 
-      // Update the user document
-      batch.update(
-        FirebaseFirestore.instance.collection('users').doc(userId),
-        {
-          'verificationStatus': decision,
-          'userType': decision == 'approved' ? 'verified_driver' : 'student',
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-      );
+      // Update the user document — use two separate updates for array operations
+      final userRef = FirebaseFirestore.instance.collection('users').doc(userId);
+
+      // First: shared fields via batch
+      batch.update(userRef, {
+        'verificationStatus': decision,
+        // Write rejection note to user doc so profile screen can display it
+        if (decision == 'rejected' && _noteController.text.trim().isNotEmpty)
+          'rejectionNote': _noteController.text.trim(),
+        if (decision == 'approved')
+          'rejectionNote': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       await batch.commit();
+
+      // Then: array operations (can't mix arrayUnion/arrayRemove in batch with other fields easily)
+      if (decision == 'approved') {
+        await userRef.update({
+          'roles': FieldValue.arrayUnion(['verified_driver']),
+        });
+        await userRef.update({
+          'roles': FieldValue.arrayRemove(['driver_candidate']),
+        });
+      } else {
+        await userRef.update({
+          'roles': FieldValue.arrayRemove(['driver_candidate']),
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

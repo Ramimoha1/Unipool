@@ -32,8 +32,7 @@ Fields:
 - `fullName` string
 - `email` string
 - `phoneNumber` string
-- `userType` string
-- `roles` array
+- `roles` array  ← single source of truth for user roles
 - `studentIdNumber` string optional
 - `matricNumber` string optional
 - `driverLicenseNumber` string optional
@@ -44,7 +43,7 @@ Fields:
 - `createdAt` timestamp
 - `updatedAt` timestamp
 
-Suggested `userType` values:
+Suggested `roles` values (a user can have multiple):
 
 - `student`
 - `driver_candidate`

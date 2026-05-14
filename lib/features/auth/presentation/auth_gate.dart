@@ -33,21 +33,21 @@ class AuthGate extends StatelessWidget {
           return const MainAuthenticationScreen();
         }
 
-        // Logged in → resolve user type and route accordingly
-        return FutureBuilder<String?>(
-          future: repo.getUserType(user.uid),
-          builder: (context, typeSnapshot) {
-            if (typeSnapshot.connectionState == ConnectionState.waiting) {
+        // Logged in → resolve user roles and route accordingly
+        return FutureBuilder<List<String>>(
+          future: repo.getUserRoles(user.uid),
+          builder: (context, rolesSnapshot) {
+            if (rolesSnapshot.connectionState == ConnectionState.waiting) {
               return const _SplashScreen();
             }
 
-            final userType = typeSnapshot.data ?? 'student';
+            final roles = rolesSnapshot.data ?? ['student'];
 
-            if (userType == 'admin') {
+            if (roles.contains('admin')) {
               return const AdminDashboardScreen();
             }
 
-            // Default: student / driver / driver_candidate
+            // Default: student / driver / etc.
             return const ProfileScreen();
           },
         );
