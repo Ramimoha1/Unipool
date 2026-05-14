@@ -42,6 +42,7 @@ class DriverVerificationRepository {
     required String userId,
     required String studentCardUrl,
     required String driverLicenseUrl,
+    required VehicleInfo vehicleInfo,
   }) async {
     // Check if a pending application already exists to avoid duplicates.
     final existing = await _firestore
@@ -60,6 +61,7 @@ class DriverVerificationRepository {
       status: DriverApplicationStatus.pending,
       studentCardUrl: studentCardUrl,
       driverLicenseUrl: driverLicenseUrl,
+      vehicleInfo: vehicleInfo,
       createdAt: DateTime.now(),
     );
 

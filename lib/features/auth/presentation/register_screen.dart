@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/constants/malaysian_universities.dart';
 import '../data/auth_repository.dart';
 
 /// Registration screen matching Figma Image 2.
@@ -199,14 +200,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 18),
 
-                // University
+                // University (searchable dropdown)
                 _FieldLabel('University'),
-                _InputField(
+                _UniversityAutocomplete(
                   controller: _universityCtrl,
-                  hint: 'e.g., Universiti Teknologi Malaysia',
-                  prefixIcon: Icons.school_outlined,
                   validator: (v) => _validateRequired(v, 'University'),
-                  textCapitalization: TextCapitalization.words,
                 ),
                 const SizedBox(height: 18),
 
@@ -501,6 +499,160 @@ class _InputField extends StatelessWidget {
           borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
         ),
       ),
+    );
+  }
+}
+
+// ─── University Autocomplete ──────────────────────────────────────────────────
+
+class _UniversityAutocomplete extends StatelessWidget {
+  const _UniversityAutocomplete({
+    required this.controller,
+    this.validator,
+  });
+
+  final TextEditingController controller;
+  final String? Function(String?)? validator;
+
+  static const Color _border = Color(0xFFE5EAF0);
+  static const Color _teal = Color(0xFF1A9B8A);
+  static const Color _textMuted = Color(0xFF9CA3AF);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Autocomplete<String>(
+          optionsBuilder: (textEditingValue) {
+            final query = textEditingValue.text.trim().toLowerCase();
+            if (query.isEmpty) {
+              // Show all options when the field is focused but empty
+              return malaysianUniversities;
+            }
+            return malaysianUniversities.where(
+              (uni) => uni.toLowerCase().contains(query),
+            );
+          },
+          onSelected: (selection) {
+            controller.text = selection;
+          },
+          fieldViewBuilder: (context, fieldCtrl, focusNode, onSubmitted) {
+            // Sync the external controller with the field controller
+            fieldCtrl.text = controller.text;
+            fieldCtrl.addListener(() {
+              if (controller.text != fieldCtrl.text) {
+                controller.text = fieldCtrl.text;
+              }
+            });
+
+            return TextFormField(
+              controller: fieldCtrl,
+              focusNode: focusNode,
+              validator: validator,
+              textCapitalization: TextCapitalization.words,
+              style: const TextStyle(
+                fontSize: 15,
+                color: Color(0xFF1A2332),
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search university...',
+                hintStyle: const TextStyle(color: _textMuted, fontSize: 14),
+                prefixIcon:
+                    const Icon(Icons.school_outlined, color: _textMuted, size: 20),
+                suffixIcon:
+                    const Icon(Icons.arrow_drop_down, color: _textMuted, size: 24),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _teal, width: 1.5),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDC2626)),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+                ),
+              ),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) {
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: 220,
+                    maxWidth: constraints.maxWidth,
+                  ),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (context, index) {
+                      final option = options.elementAt(index);
+                      final isHighlighted =
+                          AutocompleteHighlightedOption.of(context) == index;
+                      return InkWell(
+                        onTap: () => onSelected(option),
+                        child: Container(
+                          color: isHighlighted
+                              ? _teal.withValues(alpha: 0.08)
+                              : null,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.school_outlined,
+                                size: 16,
+                                color: isHighlighted
+                                    ? _teal
+                                    : const Color(0xFF9CA3AF),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  option,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isHighlighted
+                                        ? _teal
+                                        : const Color(0xFF374151),
+                                    fontWeight: isHighlighted
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

@@ -40,6 +40,14 @@ Fields:
 - `profilePhotoUrl` string optional
 - `verificationStatus` string
 - `isActive` bool
+- `vehicleInfo` map optional ← copied from driverApplication on admin approval
+  - `vehicleType` string (`car` or `motorcycle`)
+  - `brand` string
+  - `model` string
+  - `year` number
+  - `color` string
+  - `plateNumber` string
+  - `vehiclePhotoUrl` string (photo showing plate number)
 - `createdAt` timestamp
 - `updatedAt` timestamp
 
@@ -68,6 +76,7 @@ Fields:
   - `year` number (e.g. `2021`)
   - `color` string (e.g. `White`)
   - `plateNumber` string (e.g. `ABC 1234`)
+  - `vehiclePhotoUrl` string (photo showing plate number)
 - `notes` string optional
 - `reviewedBy` string optional
 - `reviewedAt` timestamp optional

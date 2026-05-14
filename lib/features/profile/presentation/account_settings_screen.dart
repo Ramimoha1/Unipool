@@ -471,7 +471,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       // Delete Firestore document first, then Auth account
       await _firestore.collection('users').doc(_user.uid).delete();
       await _user.delete();
-      // AuthGate routes back to login automatically
+
+      // Pop all screens back to root — AuthGate will detect the signed-out
+      // state and show the login screen immediately.
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } on FirebaseAuthException catch (e) {
       if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
         _showError('Incorrect password. Account not deleted.');
