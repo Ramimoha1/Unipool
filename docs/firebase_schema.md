@@ -62,6 +62,12 @@ Fields:
 - `studentCardUrl` string optional
 - `driverLicenseUrl` string optional
 - `vehicleInfo` map optional
+  - `vehicleType` string (`car` or `motorcycle`)
+  - `brand` string (e.g. `Toyota`)
+  - `model` string (e.g. `Vios`)
+  - `year` number (e.g. `2021`)
+  - `color` string (e.g. `White`)
+  - `plateNumber` string (e.g. `ABC 1234`)
 - `notes` string optional
 - `reviewedBy` string optional
 - `reviewedAt` timestamp optional
