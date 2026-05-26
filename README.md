@@ -165,6 +165,27 @@ As per our project setup, please follow these rules when developing features:
 
 Once setup is complete, you can launch the app:
 
+### One .env for Maps Keys
+
+To keep Google Maps keys in one place:
+
+1. Create `.env` at project root from `.env.example`.
+2. Add either:
+	- `MAPS_API_KEY=...` (single key for all platforms), or
+	- `MAPS_API_KEY_ANDROID=...`, `MAPS_API_KEY_IOS=...`, `MAPS_API_KEY_WEB=...`.
+3. Run:
+
+```bash
+dart run tool/sync_env.dart
+```
+
+This command updates:
+- `android/local.properties` (`MAPS_API_KEY`)
+- `ios/Runner/Info.plist` (`GMSApiKey`)
+- `web/index.html` (Google Maps JS script key)
+
+Run the sync command whenever you change keys.
+
 * **Mobile**: `flutter run`
 * **Web**: `flutter run -d chrome`
 

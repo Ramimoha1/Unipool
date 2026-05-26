@@ -1,0 +1,7 @@
+# Option 1: one shared key for all platforms
+MAPS_API_KEY=
+
+# Option 2: platform-specific keys (recommended in production)
+# MAPS_API_KEY_ANDROID=
+# MAPS_API_KEY_IOS=
+# MAPS_API_KEY_WEB=

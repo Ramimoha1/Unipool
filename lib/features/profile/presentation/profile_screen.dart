@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:unipool/features/carpool/screens/map_screen.dart';
 import '../data/driver_verification_repository.dart';
 import 'apply_driver_screen.dart';
 
@@ -622,7 +623,24 @@ class _BottomNav extends StatelessWidget {
           label: 'Profile',
         ),
       ],
-      onTap: (_) {},
+      onTap: (index) {
+        if (index == currentIndex) {
+          return;
+        }
+
+        if (index == 0) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const MapScreen()),
+          );
+          return;
+        }
+
+        if (index == 1) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Delivery module is not wired yet.')),
+          );
+        }
+      },
     );
   }
 }
