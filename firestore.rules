@@ -18,6 +18,11 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/carpool_groups/$(requestId));
     }
 
+    function isGroupMember(requestId) {
+      return exists(/databases/$(database)/documents/carpool_groups/$(requestId))
+        && groupDoc(requestId).data.member_ids.hasAny([request.auth.uid]);
+    }
+
     match /users/{userId} {
       // App flows need user profile reads (self and peers) plus self profile writes.
       // Admin keeps full access for moderation dashboards.
@@ -38,7 +43,12 @@ service cloud.firestore {
     }
 
     match /carpool_requests/{requestId} {
-      allow read: if isSignedIn() && (resource.data.status == 'open' || resource.data.creator_id == request.auth.uid);
+      allow read: if isSignedIn()
+        && (
+          resource.data.status == 'open'
+          || resource.data.creator_id == request.auth.uid
+          || isGroupMember(requestId)
+        );
       allow create: if isSignedIn() && request.resource.data.creator_id == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.creator_id == request.auth.uid;
     }
@@ -55,7 +65,11 @@ service cloud.firestore {
 
     match /carpool_groups/{requestId} {
       allow create: if isSignedIn() && request.resource.data.admin_id == request.auth.uid;
-      allow read: if isSignedIn() && resource.data.member_ids.hasAny([request.auth.uid]);
+      allow read: if isSignedIn() && (
+        resource.data.member_ids.hasAny([request.auth.uid])
+        || requestDoc(requestId).data.creator_id == request.auth.uid
+        || requestDoc(requestId).data.status == 'open'
+      );
       allow update: if isSignedIn() && resource.data.admin_id == request.auth.uid;
       allow delete: if false;
 

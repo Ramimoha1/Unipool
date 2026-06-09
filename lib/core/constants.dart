@@ -36,6 +36,7 @@ class AppFields {
   static const availableSeats = 'available_seats';
   static const rideType = 'ride_type';
   static const allowUnverifiedDriver = 'allow_unverified_driver';
+  static const joinMode = 'join_mode';
   static const status = 'status';
   static const createdAt = 'created_at';
 
@@ -46,6 +47,7 @@ class AppFields {
   static const applicantStatus = 'status';
 
   static const adminId = 'admin_id';
+  static const driverId = 'driver_id';
   static const memberIds = 'member_ids';
 
   static const senderId = 'sender_id';
@@ -109,4 +111,9 @@ class CarpoolReportStatuses {
 
 class FirebaseFunctionNames {
   static const sendFcmNotification = 'sendFCMNotification';
+}
+
+class CarpoolJoinModes {
+  static const open = 'open';
+  static const approval = 'approval';
 }

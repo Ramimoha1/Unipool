@@ -4,8 +4,7 @@
 <dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Required to upload verification documents</string>
-	<key>GMSApiKey</key>
-	<string>AIzaSyDVzjJyDBK-fDoI4WgsjiVB8lZM19MUT8c</string>
+
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

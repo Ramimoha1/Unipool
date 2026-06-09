@@ -31,7 +31,27 @@
 
   <title>unipool</title>
   <link rel="manifest" href="manifest.json">
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDVzjJyDBK-fDoI4WgsjiVB8lZM19MUT8c"></script>
+  <script>
+    fetch('assets/.env')
+      .then(response => response.text())
+      .then(text => {
+        let apiKey = '';
+        text.split('\n').forEach(line => {
+          let parts = line.split('=');
+          if (parts.length === 2) {
+            let key = parts[0].trim();
+            let val = parts[1].trim();
+            if (key === 'MAPS_API_KEY_WEB') apiKey = val;
+            else if (key === 'MAPS_API_KEY' && !apiKey) apiKey = val;
+          }
+        });
+        if (apiKey) {
+          let script = document.createElement('script');
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+          document.head.appendChild(script);
+        }
+      });
+  </script>
 </head>
 <body>
   <!--

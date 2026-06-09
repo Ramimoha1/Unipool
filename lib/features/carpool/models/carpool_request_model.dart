@@ -16,6 +16,7 @@ class CarpoolRequestModel {
     required this.availableSeats,
     required this.rideType,
     required this.allowUnverifiedDriver,
+    required this.joinMode,
     required this.status,
     required this.createdAt,
   });
@@ -33,6 +34,7 @@ class CarpoolRequestModel {
   final int availableSeats;
   final String rideType;
   final bool allowUnverifiedDriver;
+  final String joinMode;
   final String status;
   final DateTime createdAt;
 
@@ -51,6 +53,7 @@ class CarpoolRequestModel {
       availableSeats: (map[AppFields.availableSeats] as num?)?.toInt() ?? 0,
       rideType: map[AppFields.rideType] as String? ?? CarpoolRideTypes.studentDriver,
       allowUnverifiedDriver: map[AppFields.allowUnverifiedDriver] as bool? ?? false,
+      joinMode: map[AppFields.joinMode] as String? ?? CarpoolJoinModes.approval,
       status: map[AppFields.status] as String? ?? CarpoolRequestStatuses.open,
       createdAt: (map[AppFields.createdAt] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -70,6 +73,7 @@ class CarpoolRequestModel {
       AppFields.availableSeats: availableSeats,
       AppFields.rideType: rideType,
       AppFields.allowUnverifiedDriver: allowUnverifiedDriver,
+      AppFields.joinMode: joinMode,
       AppFields.status: status,
       AppFields.createdAt: Timestamp.fromDate(createdAt),
     };
@@ -89,6 +93,7 @@ class CarpoolRequestModel {
     int? availableSeats,
     String? rideType,
     bool? allowUnverifiedDriver,
+    String? joinMode,
     String? status,
     DateTime? createdAt,
   }) {
@@ -106,6 +111,7 @@ class CarpoolRequestModel {
       availableSeats: availableSeats ?? this.availableSeats,
       rideType: rideType ?? this.rideType,
       allowUnverifiedDriver: allowUnverifiedDriver ?? this.allowUnverifiedDriver,
+      joinMode: joinMode ?? this.joinMode,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
     );

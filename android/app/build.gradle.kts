@@ -17,6 +17,18 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 
+val envProperties = Properties()
+val envFile = rootProject.file("../.env")
+if (envFile.exists()) {
+    envFile.readLines().forEach { line ->
+        val trimmed = line.trim()
+        if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && trimmed.contains("=")) {
+            val parts = trimmed.split("=", limit = 2)
+            envProperties.setProperty(parts[0].trim(), parts[1].trim())
+        }
+    }
+}
+
 android {
     namespace = "com.example.unipool"
     compileSdk = flutter.compileSdkVersion
@@ -42,7 +54,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
+        val mapsKey = envProperties.getProperty("MAPS_API_KEY_ANDROID") ?: envProperties.getProperty("MAPS_API_KEY", "")
+        manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 
     buildTypes {

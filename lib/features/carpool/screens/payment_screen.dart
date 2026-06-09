@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:unipool/core/constants.dart';
 import '../providers/payment_provider.dart';
 import '../services/carpool_service.dart';
 import '../widgets/payment_banner.dart';
@@ -59,10 +61,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const SizedBox(height: 16),
                   ...members.map((memberId) {
                     final confirmed = payment.confirmedBy.contains(memberId);
-                    return ListTile(
-                      leading: Icon(confirmed ? Icons.check_circle : Icons.schedule, color: confirmed ? Colors.green : Colors.grey),
-                      title: Text(memberId),
-                      subtitle: Text(confirmed ? 'Paid' : 'Pending'),
+                    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      future: FirebaseFirestore.instance.collection(AppCollections.users).doc(memberId).get(),
+                      builder: (context, userSnapshot) {
+                        final userData = userSnapshot.data?.data() ?? const <String, dynamic>{};
+                        final displayName = (userData[AppFields.userFullName] as String?)?.trim();
+                        final verificationStatus = (userData[AppFields.userVerificationStatus] as String?) ?? 'unverified';
+                        final name = displayName != null && displayName.isNotEmpty ? displayName : memberId;
+
+                        return Card(
+                          elevation: 0,
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: ListTile(
+                            leading: Icon(confirmed ? Icons.check_circle : Icons.schedule, color: confirmed ? Colors.green : Colors.grey),
+                            title: Text(name),
+                            subtitle: Text('${confirmed ? 'Paid' : 'Pending'} • ${_verificationLabel(verificationStatus)}'),
+                          ),
+                        );
+                      },
                     );
                   }),
                   if (!payment.confirmedBy.contains(currentUid))
@@ -77,5 +93,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
         },
       ),
     );
+  }
+
+  String _verificationLabel(String status) {
+    return switch (status) {
+      'approved' || 'verified_driver' => 'Verified',
+      'pending' => 'Pending verification',
+      'rejected' => 'Verification rejected',
+      _ => 'Not verified',
+    };
   }
 }

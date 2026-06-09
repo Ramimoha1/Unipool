@@ -7,7 +7,8 @@ import '../models/carpool_request_model.dart';
 import '../services/carpool_service.dart';
 
 class CarpoolProvider extends ChangeNotifier {
-  CarpoolProvider({CarpoolService? service}) : _service = service ?? CarpoolService();
+  CarpoolProvider({CarpoolService? service})
+    : _service = service ?? CarpoolService();
 
   final CarpoolService _service;
 
@@ -16,12 +17,19 @@ class CarpoolProvider extends ChangeNotifier {
   List<CarpoolRequestModel> openRequests = [];
   List<CarpoolRequestModel> nearbyRequests = [];
   List<CarpoolRequestModel> myRequests = [];
+  List<CarpoolRequestModel> activeCarpools = [];
   bool isLoading = false;
   String? error;
 
+  bool get hasActiveCarpool => activeCarpools.isNotEmpty;
+
   StreamSubscription<List<CarpoolRequestModel>>? _openRequestsSubscription;
 
-  Future<void> loadNearbyRequests(double lat, double lng, {double radiusKm = 5}) async {
+  Future<void> loadNearbyRequests(
+    double lat,
+    double lng, {
+    double radiusKm = 5,
+  }) async {
     isLoading = true;
     error = null;
     notifyListeners();
@@ -37,13 +45,16 @@ class CarpoolProvider extends ChangeNotifier {
 
   void startOpenRequestsStream() {
     _openRequestsSubscription?.cancel();
-    _openRequestsSubscription = _service.getOpenRequests().listen((items) {
-      openRequests = items;
-      notifyListeners();
-    }, onError: (exception) {
-      error = exception.toString();
-      notifyListeners();
-    });
+    _openRequestsSubscription = _service.getOpenRequests().listen(
+      (items) {
+        openRequests = items;
+        notifyListeners();
+      },
+      onError: (exception) {
+        error = exception.toString();
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> loadMyRequests() async {
@@ -67,13 +78,40 @@ class CarpoolProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> createRequest(CarpoolRequestModel request) async {
+  Future<void> loadActiveCarpools() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      activeCarpools = [];
+      notifyListeners();
+      return;
+    }
+
     isLoading = true;
     error = null;
     notifyListeners();
     try {
-      await _service.createRequest(request);
-      currentRequest = request.copyWith(id: request.id.isEmpty ? '' : request.id);
+      activeCarpools = await _service.getActiveCarpoolsForUser(user.uid);
+    } catch (exception) {
+      error = exception.toString();
+      activeCarpools = [];
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> leaveGroup(String requestId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.leaveGroup(requestId, user.uid);
+      // Refresh active carpools + my requests after leaving
+      await loadActiveCarpools();
+      await loadMyRequests();
     } catch (exception) {
       error = exception.toString();
       rethrow;
@@ -83,7 +121,45 @@ class CarpoolProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> applyToRequest(String requestId, String userId, String role) async {
+  Future<void> kickMember(String requestId, String targetUserId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.kickMember(requestId, targetUserId);
+      await loadMyRequests();
+      await loadActiveCarpools();
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> createRequest(CarpoolRequestModel request) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final createdId = await _service.createRequest(request);
+      currentRequest = request.copyWith(id: createdId);
+      return createdId;
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> applyToRequest(
+    String requestId,
+    String userId,
+    String role,
+  ) async {
     isLoading = true;
     error = null;
     notifyListeners();
@@ -98,7 +174,11 @@ class CarpoolProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> acceptApplicant(String requestId, String applicantId, String role) async {
+  Future<void> acceptApplicant(
+    String requestId,
+    String applicantId,
+    String role,
+  ) async {
     isLoading = true;
     error = null;
     notifyListeners();
