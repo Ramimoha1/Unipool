@@ -4,6 +4,7 @@
 <dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Required to upload verification documents</string>
+
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

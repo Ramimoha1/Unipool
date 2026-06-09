@@ -1,0 +1,104 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'admin';
+    }
+
+    function requestDoc(requestId) {
+      return get(/databases/$(database)/documents/carpool_requests/$(requestId));
+    }
+
+    function groupDoc(requestId) {
+      return get(/databases/$(database)/documents/carpool_groups/$(requestId));
+    }
+
+    function isGroupMember(requestId) {
+      return exists(/databases/$(database)/documents/carpool_groups/$(requestId))
+        && groupDoc(requestId).data.member_ids.hasAny([request.auth.uid]);
+    }
+
+    match /users/{userId} {
+      // App flows need user profile reads (self and peers) plus self profile writes.
+      // Admin keeps full access for moderation dashboards.
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /driverApplications/{applicationId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /carpool_requests/{requestId} {
+      allow read: if isSignedIn()
+        && (
+          resource.data.status == 'open'
+          || resource.data.creator_id == request.auth.uid
+          || isGroupMember(requestId)
+        );
+      allow create: if isSignedIn() && request.resource.data.creator_id == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.creator_id == request.auth.uid;
+    }
+
+    match /carpool_applicants/{applicantId} {
+      allow read: if isSignedIn() && (
+        resource.data.user_id == request.auth.uid ||
+        requestDoc(resource.data.request_id).data.creator_id == request.auth.uid
+      );
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isSignedIn() && requestDoc(resource.data.request_id).data.creator_id == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /carpool_groups/{requestId} {
+      allow create: if isSignedIn() && request.resource.data.admin_id == request.auth.uid;
+      allow read: if isSignedIn() && (
+        resource.data.member_ids.hasAny([request.auth.uid])
+        || requestDoc(requestId).data.creator_id == request.auth.uid
+        || requestDoc(requestId).data.status == 'open'
+      );
+      allow update: if isSignedIn() && resource.data.admin_id == request.auth.uid;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read, create: if isSignedIn() && groupDoc(requestId).data.member_ids.hasAny([request.auth.uid]);
+        allow update, delete: if false;
+      }
+    }
+
+    match /ride_payments/{paymentId} {
+      allow read: if isSignedIn() && groupDoc(resource.data.request_id).data.member_ids.hasAny([request.auth.uid]);
+      allow create: if isSignedIn() && requestDoc(request.resource.data.request_id).data.creator_id == request.auth.uid;
+      allow update: if isSignedIn()
+        && groupDoc(resource.data.request_id).data.member_ids.hasAny([request.auth.uid])
+        && request.resource.data.request_id == resource.data.request_id
+        && request.resource.data.booked_by_user_id == resource.data.booked_by_user_id
+        && request.resource.data.qr_code_url == resource.data.qr_code_url
+        && request.resource.data.total_amount == resource.data.total_amount
+        && request.resource.data.split_amount == resource.data.split_amount
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.created_at == resource.data.created_at
+        && request.resource.data.confirmed_by.hasAll(resource.data.confirmed_by)
+        && request.resource.data.confirmed_by.hasAny([request.auth.uid]);
+      allow delete: if false;
+    }
+
+    match /ride_reports/{reportId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}

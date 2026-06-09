@@ -1,1 +1,35 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"unipool-24613","appId":"1:150858198157:android:f9c9d61a9293ee238dc6c4","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"unipool-24613","configurations":{"android":"1:150858198157:android:f9c9d61a9293ee238dc6c4","ios":"1:150858198157:ios:4c8d1bcc2b7105f48dc6c4","macos":"1:150858198157:ios:4c8d1bcc2b7105f48dc6c4","web":"1:150858198157:web:71514619cdf4e20d8dc6c4","windows":"1:150858198157:web:722a065c926931958dc6c4"}}}}}}
+{
+	"flutter": {
+		"platforms": {
+			"android": {
+				"default": {
+					"projectId": "unipool-24613",
+					"appId": "1:150858198157:android:f9c9d61a9293ee238dc6c4",
+					"fileOutput": "android/app/google-services.json"
+				}
+			},
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "unipool-24613",
+					"configurations": {
+						"android": "1:150858198157:android:f9c9d61a9293ee238dc6c4",
+						"ios": "1:150858198157:ios:4c8d1bcc2b7105f48dc6c4",
+						"macos": "1:150858198157:ios:4c8d1bcc2b7105f48dc6c4",
+						"web": "1:150858198157:web:71514619cdf4e20d8dc6c4",
+						"windows": "1:150858198157:web:722a065c926931958dc6c4"
+					}
+				}
+			}
+		}
+	},
+	"firestore": {
+		"rules": "firestore.rules"
+		
+	},
+	"storage": {
+		"rules": "storage.rules"
+	},
+	"functions": {
+		"source": "functions"
+	}
+}
