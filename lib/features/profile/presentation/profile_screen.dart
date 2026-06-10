@@ -5,6 +5,7 @@ import 'package:unipool/core/widgets/app_bottom_nav.dart';
 import '../data/driver_verification_repository.dart';
 import 'apply_driver_screen.dart';
 import 'package:unipool/features/profile/presentation/account_settings_screen.dart';
+import 'package:unipool/features/auth/presentation/auth_gate.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -120,7 +121,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         IconButton(
           icon: const Icon(Icons.logout, color: Colors.white),
-          onPressed: () => FirebaseAuth.instance.signOut(),
+          onPressed: () async {
+            await FirebaseAuth.instance.signOut();
+            if (context.mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const AuthGate()),
+                (route) => false,
+              );
+            }
+          },
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(

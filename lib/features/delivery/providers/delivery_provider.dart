@@ -142,10 +142,16 @@ class DeliveryProvider extends ChangeNotifier {
   void loadApplications(String jobId) {
     applications = [];
     notifyListeners();
-    _service.getApplications(jobId).listen((items) {
-      applications = items;
-      notifyListeners();
-    });
+    _service.getApplications(jobId).listen(
+      (items) {
+        applications = items;
+        notifyListeners();
+      },
+      onError: (exception) {
+        error = exception.toString();
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> startDelivery(String jobId) async {

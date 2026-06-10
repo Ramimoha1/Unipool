@@ -25,11 +25,17 @@ class DeliveryChatProvider extends ChangeNotifier {
     notifyListeners();
 
     _subscription?.cancel();
-    _subscription = _service.getMessages(jobId).listen((items) {
-      messages = items;
-      isLoading = false;
-      notifyListeners();
-    });
+    _subscription = _service.getMessages(jobId).listen(
+      (items) {
+        messages = items;
+        isLoading = false;
+        notifyListeners();
+      },
+      onError: (exception) {
+        isLoading = false;
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> sendMessage(

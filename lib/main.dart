@@ -7,6 +7,8 @@ import 'features/carpool/providers/carpool_provider.dart';
 import 'features/carpool/providers/chat_provider.dart';
 import 'features/carpool/providers/payment_provider.dart';
 import 'features/delivery/providers/delivery_provider.dart';
+import 'features/delivery/providers/delivery_proof_provider.dart';
+import 'features/delivery/providers/delivery_chat_provider.dart';
 import 'features/auth/presentation/auth_gate.dart';
 
 void main() async {
@@ -31,6 +33,8 @@ class MainApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
         ChangeNotifierProvider(create: (_) => DeliveryProvider()),
+        ChangeNotifierProvider(create: (_) => DeliveryProofProvider()),
+        ChangeNotifierProvider(create: (_) => DeliveryChatProvider()),
       ],
       child: MaterialApp(
         title: 'UniPool',

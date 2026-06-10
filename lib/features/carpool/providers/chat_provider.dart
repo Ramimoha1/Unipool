@@ -24,11 +24,17 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     _subscription?.cancel();
-    _subscription = _service.getMessages(groupId).listen((items) {
-      messages = items;
-      isLoading = false;
-      notifyListeners();
-    });
+    _subscription = _service.getMessages(groupId).listen(
+      (items) {
+        messages = items;
+        isLoading = false;
+        notifyListeners();
+      },
+      onError: (exception) {
+        isLoading = false;
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> sendMessage(String groupId, ChatMessageModel message) async {

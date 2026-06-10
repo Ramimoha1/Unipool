@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:unipool/features/auth/presentation/auth_gate.dart';
 
 /// Account settings screen. Accessible from the settings icon on ProfileScreen.
 ///
@@ -408,7 +409,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     );
     if (!confirmed) return;
     await FirebaseAuth.instance.signOut();
-    // AuthGate will handle routing back to login
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthGate()),
+        (route) => false,
+      );
+    }
   }
 
   // ─── Delete Account ───────────────────────────────────────────────────────
