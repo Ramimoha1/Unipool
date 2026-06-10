@@ -46,3 +46,6 @@ app.*.map.json
 
 repomix-output.xml
 cors.json
+
+.env
+.agent/*
