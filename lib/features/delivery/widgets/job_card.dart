@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/delivery_job_model.dart';
 
@@ -74,7 +75,7 @@ class JobCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '\$${job.price.toInt()}',
+                        'RM${job.price.toInt()}',
                         style: const TextStyle(
                           color: _greenBadgeText,
                           fontWeight: FontWeight.w700,
@@ -142,38 +143,49 @@ class JobCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 
                 // Poster Info Footer
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundColor: _purple.withOpacity(0.1),
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: _purple,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  future: FirebaseFirestore.instance.collection('users').doc(job.sellerId).get(),
+                  builder: (context, snap) {
+                    final data = snap.data?.data();
+                    final sellerName = (data?['fullName'] as String?)?.trim() ?? (job.sellerId.isNotEmpty ? job.sellerId : 'Unknown Seller');
+                    final initial = sellerName.isNotEmpty ? sellerName[0].toUpperCase() : '?';
+
+                    return Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: _purple.withOpacity(0.1),
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: _purple,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        job.sellerId.isNotEmpty ? job.sellerId : 'Unknown Seller',
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 13,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            sellerName,
+                            style: const TextStyle(
+                              color: _textSecondary,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                    ),
-                    Text(
-                      '${job.deliveryStops.length} stops',
-                      style: const TextStyle(
-                        color: _textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+                        Text(
+                          '${job.deliveryStops.length} stops',
+                          style: const TextStyle(
+                            color: _textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

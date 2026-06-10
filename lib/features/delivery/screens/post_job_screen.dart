@@ -234,7 +234,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
             const SizedBox(height: 8),
             _StyledField(
               controller: _pickupController,
-              hint: 'e.g., NUS Utown',
+              hint: 'e.g., PRZS',
               prefixIcon: Icons.location_on_outlined,
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Enter pickup location' : null,
@@ -314,12 +314,12 @@ class _PostJobScreenState extends State<PostJobScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _SectionLabel(label: 'Pay Offered (\$)'),
+                      _SectionLabel(label: 'Pay Offered (RM)'),
                       const SizedBox(height: 8),
                       _StyledField(
                         controller: _priceController,
                         hint: '15',
-                        prefixIcon: Icons.attach_money,
+                        prefixText: 'RM ',
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
@@ -486,6 +486,7 @@ class _StyledField extends StatelessWidget {
     required this.controller,
     required this.hint,
     this.prefixIcon,
+    this.prefixText,
     this.iconColor = _kPurple,
     this.keyboardType,
     this.validator,
@@ -495,6 +496,7 @@ class _StyledField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final IconData? prefixIcon;
+  final String? prefixText;
   final Color iconColor;
   final TextInputType? keyboardType;
   final FormFieldValidator<String>? validator;
@@ -510,6 +512,8 @@ class _StyledField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 14),
+        prefixText: prefixText,
+        prefixStyle: const TextStyle(color: _kTextPrimary, fontSize: 14),
         prefixIcon: prefixIcon != null
             ? Icon(prefixIcon, color: iconColor, size: 18)
             : null,

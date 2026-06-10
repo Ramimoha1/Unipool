@@ -357,7 +357,7 @@ class _PriceBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        '\$${price.toStringAsFixed(0)}',
+        'RM${price.toStringAsFixed(0)}',
         style: const TextStyle(
           color: _kGreen,
           fontWeight: FontWeight.w700,

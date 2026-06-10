@@ -57,12 +57,14 @@ class _DriverJobsScreenState extends State<DriverJobsScreen>
 
     final activeJobs = driverJobs.where((j) {
       return j.jobStatus != DeliveryJobStatuses.completed &&
-          j.jobStatus != DeliveryJobStatuses.cancelled;
+          j.jobStatus != DeliveryJobStatuses.cancelled &&
+          j.jobStatus != DeliveryApplicationStatuses.rejected;
     }).toList();
 
     final pastJobs = driverJobs.where((j) {
       return j.jobStatus == DeliveryJobStatuses.completed ||
-          j.jobStatus == DeliveryJobStatuses.cancelled;
+          j.jobStatus == DeliveryJobStatuses.cancelled ||
+          j.jobStatus == DeliveryApplicationStatuses.rejected;
     }).toList();
 
     return Scaffold(
@@ -332,6 +334,7 @@ class _DriverJobCard extends StatelessWidget {
         DeliveryJobStatuses.cancelled =>
           ('Cancelled', Colors.redAccent),
         DeliveryJobStatuses.disputed => ('Disputed', Colors.orange),
+        DeliveryApplicationStatuses.rejected => ('Rejected', Colors.redAccent),
         _ => (status, _kTextSecondary),
       };
 }
@@ -349,7 +352,7 @@ class _PriceBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        '\$${price.toStringAsFixed(0)}',
+        'RM${price.toStringAsFixed(0)}',
         style: const TextStyle(
           color: _kGreen,
           fontWeight: FontWeight.w700,

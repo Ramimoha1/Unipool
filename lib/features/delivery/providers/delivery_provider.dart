@@ -196,7 +196,9 @@ class DeliveryProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      driverJobs = await _service.getDriverJobs(user.uid);
+      final assignedJobs = await _service.getDriverJobs(user.uid);
+      final rejectedJobs = await _service.getRejectedDriverJobs(user.uid);
+      driverJobs = [...assignedJobs, ...rejectedJobs];
     } catch (exception) {
       error = exception.toString();
     } finally {

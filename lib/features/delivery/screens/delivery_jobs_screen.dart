@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/delivery_job_model.dart';
@@ -325,41 +326,50 @@ class _JobCard extends StatelessWidget {
               const SizedBox(height: 10),
 
               // Seller row
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: _kPurpleLight,
-                    child: Text(
-                      initials,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _kPurple,
+              FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                future: FirebaseFirestore.instance.collection('users').doc(job.sellerId).get(),
+                builder: (context, snap) {
+                  final data = snap.data?.data();
+                  final sellerName = (data?['fullName'] as String?)?.trim() ?? (job.sellerId.isNotEmpty ? job.sellerId : 'Unknown Seller');
+                  final sellerInit = sellerName.isNotEmpty ? sellerName[0].toUpperCase() : '?';
+
+                  return Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor: _kPurpleLight,
+                        child: Text(
+                          sellerInit,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _kPurple,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      job.sellerId.length > 8
-                          ? job.sellerId.substring(0, 8)
-                          : job.sellerId,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: _kTextSecondary,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          sellerName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: _kTextSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ),
-                  Text(
-                    '$stopCount ${stopCount == 1 ? 'stop' : 'stops'}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: _kTextSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+                      Text(
+                        '$stopCount ${stopCount == 1 ? 'stop' : 'stops'}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: _kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -390,7 +400,7 @@ class _PriceBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        '\$${price.toStringAsFixed(0)}',
+        'RM${price.toStringAsFixed(0)}',
         style: const TextStyle(
           color: _kGreen,
           fontWeight: FontWeight.w700,

@@ -146,11 +146,17 @@ class DeliveryService {
             .doc(driverId)
             .get();
         final userData = userDoc.data();
+        
+        final roles = userData?[AppFields.userRoles] as List<dynamic>? ?? [];
         final userRole =
             (userData?[AppFields.userRole] as String?) ??
             (userData?[AppFields.userType] as String?);
-        if (userRole != 'verified_driver') {
-          throw Exception('Only verified drivers can apply for this job.');
+            
+        final isVerified = roles.contains('verified_driver') || 
+                           userRole == 'verified_driver';
+
+        if (!isVerified) {
+          throw Exception('You are not a verified driver, this job is only for verified driver. Apply to be verified driver in profile.');
         }
       }
 
@@ -219,18 +225,34 @@ class DeliveryService {
       final jobRef = _jobs.doc(jobId);
       final appRef = _applications(jobId).doc(applicationId);
 
-      await _firestore.runTransaction((transaction) async {
-        transaction.update(appRef, {
-          AppFields.status: DeliveryApplicationStatuses.approved,
-          AppFields.updatedAt: Timestamp.now(),
-        });
-        transaction.update(jobRef, {
-          AppFields.assignedDriverId: driverId,
-          AppFields.sellerApprovedDriverId: driverId,
-          AppFields.jobStatus: DeliveryJobStatuses.driverAssigned,
-          AppFields.updatedAt: Timestamp.now(),
-        });
+      final batch = _firestore.batch();
+      
+      batch.update(appRef, {
+        AppFields.status: DeliveryApplicationStatuses.approved,
+        AppFields.updatedAt: Timestamp.now(),
       });
+      batch.update(jobRef, {
+        AppFields.assignedDriverId: driverId,
+        AppFields.sellerApprovedDriverId: driverId,
+        AppFields.jobStatus: DeliveryJobStatuses.driverAssigned,
+        AppFields.updatedAt: Timestamp.now(),
+      });
+
+      // Reject all other pending applications
+      final otherAppsSnapshot = await _applications(jobId)
+          .where(AppFields.status, isEqualTo: DeliveryApplicationStatuses.pending)
+          .get();
+          
+      for (final doc in otherAppsSnapshot.docs) {
+        if (doc.id != applicationId) {
+          batch.update(doc.reference, {
+            AppFields.status: DeliveryApplicationStatuses.rejected,
+            AppFields.updatedAt: Timestamp.now(),
+          });
+        }
+      }
+
+      await batch.commit();
 
       await _notificationService.sendFCMToUser(
         driverId,
@@ -328,6 +350,39 @@ class DeliveryService {
           .toList();
     } catch (error) {
       throw Exception('Failed to load driver jobs: $error');
+    }
+  }
+
+  /// Loads jobs where the driver's application was rejected
+  Future<List<DeliveryJobModel>> getRejectedDriverJobs(String driverId) async {
+    try {
+      final appsSnapshot = await _firestore
+          .collectionGroup('applications')
+          .where(AppFields.driverId, isEqualTo: driverId)
+          .get();
+
+      if (appsSnapshot.docs.isEmpty) return [];
+
+      final rejectedJobIds = appsSnapshot.docs
+          .where((doc) =>
+              doc.data()[AppFields.status] ==
+              DeliveryApplicationStatuses.rejected)
+          .map((doc) => doc.data()[AppFields.jobId] as String? ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      final jobs = <DeliveryJobModel>[];
+      for (final id in rejectedJobIds) {
+        final doc = await _jobs.doc(id).get();
+        if (doc.exists) {
+          final job = DeliveryJobModel.fromMap(doc.data()!, doc.id);
+          jobs.add(job.copyWith(jobStatus: DeliveryApplicationStatuses.rejected));
+        }
+      }
+      return jobs;
+    } catch (error) {
+      throw Exception('Failed to load rejected jobs: $error');
     }
   }
 

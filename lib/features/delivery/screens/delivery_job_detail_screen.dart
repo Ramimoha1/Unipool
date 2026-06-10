@@ -1003,7 +1003,7 @@ class _PriceBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        '\$${price.toStringAsFixed(0)}',
+        'RM${price.toStringAsFixed(0)}',
         style: const TextStyle(
           color: _kGreen,
           fontWeight: FontWeight.w700,
@@ -1265,7 +1265,9 @@ class _ApplicantsSheet extends StatelessWidget {
       provider.loadApplications(jobId);
     });
 
-    final apps = provider.applications;
+    final allApps = provider.applications;
+    final approvedApp = allApps.where((a) => a.status == DeliveryApplicationStatuses.approved).firstOrNull;
+    final apps = approvedApp != null ? [approvedApp] : allApps;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -1491,49 +1493,7 @@ class _ApplicantCard extends StatelessWidget {
               ],
             ),
           ],
-          if (isApproved) ...[
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DeliveryChatScreen(
-                      jobId: jobId,
-                      currentUid: currentUid,
-                      otherUid: application.driverId,
-                      otherLabel: 'Driver',
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _kPurpleLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.chat_bubble_outline,
-                        size: 15, color: _kPurple),
-                    SizedBox(width: 6),
-                    Text(
-                      'Open Chat',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: _kPurple,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+
         ],
       ),
     );
