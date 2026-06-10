@@ -17,7 +17,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   static const Color _redBorder = Color(0xFFFECACA);
   static const Color _textDark = Color(0xFF1A2332);
   static const Color _textMuted = Color(0xFF9CA3AF);
-  static const Color _border = Color(0xFFE5EAF0);
 
   // ─── State ───────────────────────────────────────────────────────────────
   final _formKey = GlobalKey<FormState>();
@@ -46,7 +45,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         email: _emailCtrl.text,
         password: _passwordCtrl.text,
       );
-      // AuthGate will detect userType == 'admin' and route to AdminDashboardScreen.
+      // AuthGate will detect 'admin' in roles and route to AdminDashboardScreen.
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
     } on Exception catch (e) {
@@ -197,7 +196,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     onPressed: _isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _red,
-                      disabledBackgroundColor: _red.withOpacity(0.6),
+                      disabledBackgroundColor: _red.withValues(alpha: 0.6),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
