@@ -100,5 +100,30 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow read, update, delete: if isAdmin();
     }
+
+    match /delivery_jobs/{jobId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isAdmin() || resource.data.seller_id == request.auth.uid;
+
+      match /applications/{applicationId} {
+        allow read, create, update: if isSignedIn();
+        allow delete: if false;
+      }
+
+      match /messages/{messageId} {
+        allow read, create: if isSignedIn();
+        allow update, delete: if false;
+      }
+
+      match /proofs/{proofId} {
+        allow read, create, update: if isSignedIn();
+        allow delete: if false;
+      }
+    }
+
+    match /delivery_disputes/{disputeId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
   }
 }

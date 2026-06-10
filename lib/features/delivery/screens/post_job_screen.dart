@@ -1,10 +1,27 @@
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
+// Hallmark · pre-emit critique: P4 H5 E5 S4 R4 V4
+// Screen: Post Delivery Job (Seller view)
+
+import 'dart:io' as io;
+
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:unipool/core/widgets/app_bottom_nav.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import 'package:unipool/core/constants.dart';
 import '../models/delivery_job_model.dart';
 import '../providers/delivery_provider.dart';
+import 'delivery_job_detail_screen.dart';
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const _kPurple = Color(0xFF7C3AED);
+const _kSurface = Color(0xFFF8F8F8);
+const _kCardBg = Colors.white;
+const _kTextPrimary = Color(0xFF111827);
+const _kTextSecondary = Color(0xFF6B7280);
+const _kDivider = Color(0xFFE5E7EB);
+const _kBorderRadius = 12.0;
 
 class PostJobScreen extends StatefulWidget {
   const PostJobScreen({super.key});
@@ -14,398 +31,629 @@ class PostJobScreen extends StatefulWidget {
 }
 
 class _PostJobScreenState extends State<PostJobScreen> {
-  static const Color _purple = Color(0xFF9C27B0);
-  
   final _formKey = GlobalKey<FormState>();
+
+  // Controllers
   final _pickupController = TextEditingController();
   final _itemNameController = TextEditingController();
-  final _payController = TextEditingController();
-  
-  List<TextEditingController> _stopControllers = [TextEditingController()];
-  int _quantity = 1;
-  
-  DateTime _startTime = DateTime.now().add(const Duration(hours: 1));
-  DateTime _endTime = DateTime.now().add(const Duration(hours: 3));
+  final _quantityController = TextEditingController(text: '1');
+  final _priceController = TextEditingController();
+
+  // Delivery stops — starts with one empty stop
+  final List<TextEditingController> _stopControllers = [
+    TextEditingController(),
+  ];
+
+  TimeOfDay? _windowStart;
+  TimeOfDay? _windowEnd;
+  String _allowedDrivers = DeliveryAllowedDrivers.verifiedAndUnverified;
+
+  // Photo
+  XFile? _itemPhoto;
+
+  bool _saving = false;
 
   @override
   void dispose() {
     _pickupController.dispose();
     _itemNameController.dispose();
-    _payController.dispose();
-    for (var c in _stopControllers) {
+    _quantityController.dispose();
+    _priceController.dispose();
+    for (final c in _stopControllers) {
       c.dispose();
     }
     super.dispose();
   }
 
-  Future<void> _selectTime(bool isStart) async {
-    final initial = isStart ? _startTime : _endTime;
-    final time = await showTimePicker(
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  Future<void> _pickTime({required bool isStart}) async {
+    final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: _kPurple),
+        ),
+        child: child!,
+      ),
     );
-    if (time != null) {
-      final now = DateTime.now();
-      setState(() {
-        if (isStart) {
-          _startTime = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-        } else {
-          _endTime = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-        }
-      });
-    }
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        _windowStart = picked;
+      } else {
+        _windowEnd = picked;
+      }
+    });
   }
 
-  void _postJob() async {
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+    setState(() => _itemPhoto = picked);
+  }
+
+  Future<String?> _uploadPhoto() async {
+    if (_itemPhoto == null) return null;
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final ref = FirebaseStorage.instance.ref().child(
+      'delivery_item_photos/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg',
+    );
+    if (kIsWeb) {
+      final bytes = await _itemPhoto!.readAsBytes();
+      await ref.putData(bytes);
+    } else {
+      await ref.putFile(io.File(_itemPhoto!.path));
+    }
+    return ref.getDownloadURL();
+  }
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in first.')),
-      );
+    if (_windowStart == null || _windowEnd == null) {
+      _showError('Please select a time window.');
       return;
     }
 
     final stops = _stopControllers
         .map((c) => c.text.trim())
-        .where((text) => text.isNotEmpty)
-        .map((label) => {'label': label, 'lat': 0.0, 'lng': 0.0}) // Placeholders for lat/lng
+        .where((t) => t.isNotEmpty)
+        .map((label) => {'label': label, 'lat': 0.0, 'lng': 0.0})
         .toList();
 
     if (stops.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one delivery stop.')),
-      );
+      _showError('Add at least one delivery stop.');
       return;
     }
 
-    final job = DeliveryJobModel(
-      id: '',
-      createdBy: user.uid,
-      sellerId: user.uid,
-      title: _itemNameController.text.trim(),
-      pickupLabel: _pickupController.text.trim(),
-      pickupLat: 0.0,
-      pickupLng: 0.0,
-      deliveryStops: stops,
-      deliveryTime: DateTime.now(), // Legacy field
-      timeWindowStart: _startTime,
-      timeWindowEnd: _endTime,
-      items: [
-        {'name': _itemNameController.text.trim(), 'description': ''}
-      ],
-      quantity: _quantity,
-      price: double.parse(_payController.text.trim()),
-      allowedDrivers: 'all',
-      jobStatus: 'open',
-      assignedDriverId: '',
-      sellerApprovedDriverId: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    setState(() => _saving = true);
 
     try {
-      await context.read<DeliveryProvider>().createJob(job);
-      if (mounted) {
-        Navigator.pop(context);
+      String? photoUrl;
+      if (_itemPhoto != null) {
+        photoUrl = await _uploadPhoto();
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create job: $e')),
+
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final now = DateTime.now();
+      final baseDate = DateTime(now.year, now.month, now.day);
+      final start = baseDate.add(
+        Duration(hours: _windowStart!.hour, minutes: _windowStart!.minute),
+      );
+      final end = baseDate.add(
+        Duration(hours: _windowEnd!.hour, minutes: _windowEnd!.minute),
+      );
+
+      final job = DeliveryJobModel(
+        id: '',
+        createdBy: uid,
+        sellerId: uid,
+        title: _itemNameController.text.trim(),
+        pickupLabel: _pickupController.text.trim(),
+        pickupLat: 0,
+        pickupLng: 0,
+        deliveryStops: stops,
+        deliveryTime: start,
+        timeWindowStart: start,
+        timeWindowEnd: end,
+        items: [
+          {
+            'name': _itemNameController.text.trim(),
+            'description': '',
+            if (photoUrl != null) 'photo_url': photoUrl,
+          }
+        ],
+        quantity: int.tryParse(_quantityController.text.trim()) ?? 1,
+        price: double.tryParse(_priceController.text.trim()) ?? 0,
+        allowedDrivers: _allowedDrivers,
+        jobStatus: DeliveryJobStatuses.open,
+        assignedDriverId: '',
+        sellerApprovedDriverId: '',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final id =
+          await context.read<DeliveryProvider>().createJob(job);
+
+      if (mounted && id != null) {
+        if (!mounted) return;
+        final created = job.copyWith(id: id);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DeliveryJobDetailScreen(
+              job: created,
+              currentUid: uid,
+            ),
+          ),
         );
       }
+    } catch (e) {
+      if (mounted) _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.redAccent,
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: _kSurface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: const BackButton(color: Color(0xFF1A2332)),
+        backgroundColor: _kPurple,
+        foregroundColor: Colors.white,
         title: const Text(
           'Post Delivery Job',
-          style: TextStyle(
-            color: Color(0xFF1A2332),
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w700),
         ),
+        elevation: 0,
       ),
-      body: Consumer<DeliveryProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionTitle('Pickup Location'),
-                  _buildTextField(
-                    controller: _pickupController,
-                    hintText: 'e.g., NUS Utown',
-                    icon: Icons.location_on_outlined,
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  _buildSectionTitle('Delivery Stops'),
-                  ...List.generate(_stopControllers.length, (index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildTextField(
-                        controller: _stopControllers[index],
-                        hintText: 'Stop ${index + 1}',
-                        icon: Icons.flag_outlined,
-                        suffixIcon: index > 0
-                            ? IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                                onPressed: () {
-                                  setState(() {
-                                    _stopControllers[index].dispose();
-                                    _stopControllers.removeAt(index);
-                                  });
-                                },
-                              )
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+          children: [
+            // ── Pickup ──
+            _SectionLabel(label: 'Pickup Location'),
+            const SizedBox(height: 8),
+            _StyledField(
+              controller: _pickupController,
+              hint: 'e.g., NUS Utown',
+              prefixIcon: Icons.location_on_outlined,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Enter pickup location' : null,
+            ),
+            const SizedBox(height: 20),
+
+            // ── Delivery Stops ──
+            _SectionLabel(label: 'Delivery Stops'),
+            const SizedBox(height: 8),
+            for (int i = 0; i < _stopControllers.length; i++) ...[
+              _StyledField(
+                controller: _stopControllers[i],
+                hint: 'Stop ${i + 1}',
+                prefixIcon: Icons.location_on_outlined,
+                iconColor: _kTextSecondary,
+                validator: i == 0
+                    ? (v) => (v == null || v.trim().isEmpty)
+                        ? 'Add at least one stop'
+                        : null
+                    : null,
+                suffix: i > 0
+                    ? IconButton(
+                        icon: const Icon(Icons.remove_circle_outline,
+                            color: Colors.redAccent, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _stopControllers[i].dispose();
+                            _stopControllers.removeAt(i);
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              const SizedBox(height: 8),
+            ],
+            _AddStopButton(
+              onTap: () => setState(
+                () => _stopControllers.add(TextEditingController()),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Item Name ──
+            _SectionLabel(label: 'Item Name'),
+            const SizedBox(height: 8),
+            _StyledField(
+              controller: _itemNameController,
+              hint: 'e.g., Textbooks, Food, Groceries',
+              prefixIcon: Icons.inventory_2_outlined,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Enter item name' : null,
+            ),
+            const SizedBox(height: 20),
+
+            // ── Quantity + Price ──
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SectionLabel(label: 'Quantity'),
+                      const SizedBox(height: 8),
+                      _StyledField(
+                        controller: _quantityController,
+                        hint: '1',
+                        keyboardType: TextInputType.number,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Required'
                             : null,
                       ),
-                    );
-                  }),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _stopControllers.add(TextEditingController());
-                      });
-                    },
-                    child: const Text(
-                      '+ Add another stop',
-                      style: TextStyle(
-                        color: _purple,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-
-                  _buildSectionTitle('Item Name'),
-                  _buildTextField(
-                    controller: _itemNameController,
-                    hintText: 'e.g., Textbooks',
-                    icon: Icons.inventory_2_outlined,
-                  ),
-                  const SizedBox(height: 24),
-
-                  Row(
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle('Quantity'),
-                            Container(
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFD9E2EC)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.remove, color: _purple),
-                                    onPressed: () {
-                                      if (_quantity > 1) setState(() => _quantity--);
-                                    },
-                                  ),
-                                  Text(
-                                    '$_quantity',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF1A2332),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.add, color: _purple),
-                                    onPressed: () {
-                                      setState(() => _quantity++);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                      _SectionLabel(label: 'Pay Offered (\$)'),
+                      const SizedBox(height: 8),
+                      _StyledField(
+                        controller: _priceController,
+                        hint: '15',
+                        prefixIcon: Icons.attach_money,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle('Pay Offered'),
-                            _buildTextField(
-                              controller: _payController,
-                              hintText: '\$',
-                              keyboardType: TextInputType.number,
-                            ),
-                          ],
-                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Required';
+                          }
+                          if (double.tryParse(v.trim()) == null) {
+                            return 'Invalid';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
 
-                  _buildSectionTitle('Time Window'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _selectTime(true),
-                          child: Container(
-                            height: 56,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFD9E2EC)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.access_time, color: Color(0xFF8A96A3), size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  DateFormat('h:mm a').format(_startTime),
-                                  style: const TextStyle(fontSize: 15, color: Color(0xFF1A2332)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('to', style: TextStyle(color: Color(0xFF8A96A3))),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _selectTime(false),
-                          child: Container(
-                            height: 56,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFD9E2EC)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.access_time, color: Color(0xFF8A96A3), size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  DateFormat('h:mm a').format(_endTime),
-                                  style: const TextStyle(fontSize: 15, color: Color(0xFF1A2332)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+            // ── Time Window ──
+            _SectionLabel(label: 'Time Window'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _TimePickerTile(
+                    value: _windowStart,
+                    onTap: () => _pickTime(isStart: true),
                   ),
-                  const SizedBox(height: 40),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _TimePickerTile(
+                    value: _windowEnd,
+                    onTap: () => _pickTime(isStart: false),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
 
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _postJob,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _purple,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Post Job',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+            // ── Allowed Drivers ──
+            _SectionLabel(label: 'Who can deliver?'),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: _kCardBg,
+                borderRadius: BorderRadius.circular(_kBorderRadius),
+                border: Border.all(color: _kDivider),
+              ),
+              child: Column(
+                children: [
+                  RadioListTile<String>(
+                    dense: true,
+                    activeColor: _kPurple,
+                    title: const Text('Verified drivers only',
+                        style: TextStyle(fontSize: 14)),
+                    value: DeliveryAllowedDrivers.verifiedOnly,
+                    groupValue: _allowedDrivers,
+                    onChanged: (v) =>
+                        setState(() => _allowedDrivers = v!),
                   ),
-                  const SizedBox(height: 20),
+                  const Divider(height: 1, color: _kDivider),
+                  RadioListTile<String>(
+                    dense: true,
+                    activeColor: _kPurple,
+                    title: const Text('Any driver',
+                        style: TextStyle(fontSize: 14)),
+                    value: DeliveryAllowedDrivers.verifiedAndUnverified,
+                    groupValue: _allowedDrivers,
+                    onChanged: (v) =>
+                        setState(() => _allowedDrivers = v!),
+                  ),
                 ],
               ),
             ),
-          );
-        },
-      ),
-      bottomNavigationBar: const AppBottomNav(currentIndex: 1),
-    );
-  }
+            const SizedBox(height: 20),
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF1A2332),
+            // ── Photo ──
+            _SectionLabel(label: 'Item Photo (Optional)'),
+            const SizedBox(height: 8),
+            _PhotoPicker(
+              file: _itemPhoto,
+              onTap: _pickPhoto,
+            ),
+          ],
+        ),
+      ),
+
+      // ── Bottom CTA ──
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          16 + MediaQuery.of(context).padding.bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(15),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          height: 52,
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: _kPurple,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: _saving ? null : _submit,
+            child: _saving
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Post Job',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hintText,
-    IconData? icon,
-    Widget? suffixIcon,
-    TextInputType? keyboardType,
-  }) {
+// ─── Reusable sub-widgets ─────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: _kTextPrimary,
+      ),
+    );
+  }
+}
+
+class _StyledField extends StatelessWidget {
+  const _StyledField({
+    required this.controller,
+    required this.hint,
+    this.prefixIcon,
+    this.iconColor = _kPurple,
+    this.keyboardType,
+    this.validator,
+    this.suffix,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final IconData? prefixIcon;
+  final Color iconColor;
+  final TextInputType? keyboardType;
+  final FormFieldValidator<String>? validator;
+  final Widget? suffix;
+
+  @override
+  Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Required field';
-        }
-        return null;
-      },
+      validator: validator,
+      style: const TextStyle(fontSize: 14, color: _kTextPrimary),
       decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: const TextStyle(color: Color(0xFFB0BAC8)),
-        prefixIcon: icon != null ? Icon(icon, color: const Color(0xFF8A96A3), size: 22) : null,
-        suffixIcon: suffixIcon,
+        hintText: hint,
+        hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 14),
+        prefixIcon: prefixIcon != null
+            ? Icon(prefixIcon, color: iconColor, size: 18)
+            : null,
+        suffixIcon: suffix,
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFD9E2EC)),
+          borderRadius: BorderRadius.circular(_kBorderRadius),
+          borderSide: const BorderSide(color: _kDivider),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFD9E2EC)),
+          borderRadius: BorderRadius.circular(_kBorderRadius),
+          borderSide: const BorderSide(color: _kDivider),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _purple),
+          borderRadius: BorderRadius.circular(_kBorderRadius),
+          borderSide: const BorderSide(color: _kPurple, width: 1.5),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(_kBorderRadius),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddStopButton extends StatelessWidget {
+  const _AddStopButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_kBorderRadius),
+          border: Border.all(
+            color: _kPurple.withAlpha(80),
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add, color: _kPurple, size: 18),
+            SizedBox(width: 6),
+            Text(
+              'Add Another Stop',
+              style: TextStyle(
+                color: _kPurple,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimePickerTile extends StatelessWidget {
+  const _TimePickerTile({required this.value, required this.onTap});
+
+  final TimeOfDay? value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_kBorderRadius),
+          border: Border.all(color: _kDivider),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          children: [
+            const Icon(Icons.access_time_outlined,
+                size: 18, color: _kTextSecondary),
+            const SizedBox(width: 8),
+            Text(
+              value != null ? value!.format(context) : '- - : - -',
+              style: TextStyle(
+                fontSize: 14,
+                color: value != null ? _kTextPrimary : _kTextSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PhotoPicker extends StatelessWidget {
+  const _PhotoPicker({required this.file, required this.onTap});
+
+  final XFile? file;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 80,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_kBorderRadius),
+          border: Border.all(color: _kDivider),
+        ),
+        child: file == null
+            ? const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_photo_alternate_outlined,
+                      color: _kTextSecondary, size: 22),
+                  SizedBox(width: 8),
+                  Text(
+                    'Tap to add photo',
+                    style: TextStyle(color: _kTextSecondary, fontSize: 14),
+                  ),
+                ],
+              )
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(_kBorderRadius),
+                child: kIsWeb
+                    ? const Icon(Icons.check_circle, color: _kPurple, size: 32)
+                    : Image.file(
+                        io.File(file!.path),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                      ),
+              ),
       ),
     );
   }

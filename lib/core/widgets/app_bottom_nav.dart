@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:unipool/features/carpool/screens/map_screen.dart';
-import 'package:unipool/features/delivery/screens/delivery_jobs_screen.dart';
+import 'package:unipool/features/delivery/screens/delivery_home_screen.dart';
 import 'package:unipool/features/profile/presentation/profile_screen.dart';
 
 class AppBottomNav extends StatelessWidget {
@@ -49,7 +49,7 @@ class AppBottomNav extends StatelessWidget {
 
         if (index == 1) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const DeliveryJobsScreen()),
+            MaterialPageRoute(builder: (_) => const DeliveryHomeScreen()),
           );
           return;
         }
