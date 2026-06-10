@@ -16,10 +16,12 @@ class DeliveryProvider extends ChangeNotifier {
   List<DeliveryApplicationModel> applications = [];
   List<DeliveryJobModel> openJobs = [];
   List<DeliveryJobModel> myJobs = [];
+  List<DeliveryJobModel> driverJobs = [];
   bool isLoading = false;
   String? error;
 
   StreamSubscription<List<DeliveryJobModel>>? _openJobsSubscription;
+  StreamSubscription<List<DeliveryJobModel>>? _driverJobsSubscription;
 
   void startOpenJobsStream() {
     _openJobsSubscription?.cancel();
@@ -146,9 +148,78 @@ class DeliveryProvider extends ChangeNotifier {
     });
   }
 
+  Future<void> startDelivery(String jobId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.startDelivery(jobId);
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> completeJob(String jobId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.completeJob(jobId);
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadDriverJobs() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      driverJobs = [];
+      notifyListeners();
+      return;
+    }
+
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      driverJobs = await _service.getDriverJobs(user.uid);
+    } catch (exception) {
+      error = exception.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void startDriverJobsStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _driverJobsSubscription?.cancel();
+    _driverJobsSubscription = _service.getDriverJobsStream(user.uid).listen(
+      (items) {
+        driverJobs = items;
+        notifyListeners();
+      },
+      onError: (exception) {
+        error = exception.toString();
+        notifyListeners();
+      },
+    );
+  }
+
   @override
   void dispose() {
     _openJobsSubscription?.cancel();
+    _driverJobsSubscription?.cancel();
     super.dispose();
   }
 }

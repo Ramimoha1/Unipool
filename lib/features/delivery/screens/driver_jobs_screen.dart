@@ -1,5 +1,5 @@
 // Hallmark · pre-emit critique: P4 H4 E5 S4 R4 V4
-// Screen: My Delivery Jobs — Seller's posted jobs view
+// Screen: Driver Jobs — Driver's assigned jobs view
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,7 +9,6 @@ import 'package:unipool/core/constants.dart';
 import '../models/delivery_job_model.dart';
 import '../providers/delivery_provider.dart';
 import 'delivery_job_detail_screen.dart';
-import 'post_job_screen.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _kPurple = Color(0xFF7C3AED);
@@ -22,14 +21,14 @@ const _kTextPrimary = Color(0xFF111827);
 const _kTextSecondary = Color(0xFF6B7280);
 const _kDivider = Color(0xFFE5E7EB);
 
-class MyDeliveryJobsScreen extends StatefulWidget {
-  const MyDeliveryJobsScreen({super.key});
+class DriverJobsScreen extends StatefulWidget {
+  const DriverJobsScreen({super.key});
 
   @override
-  State<MyDeliveryJobsScreen> createState() => _MyDeliveryJobsScreenState();
+  State<DriverJobsScreen> createState() => _DriverJobsScreenState();
 }
 
-class _MyDeliveryJobsScreenState extends State<MyDeliveryJobsScreen>
+class _DriverJobsScreenState extends State<DriverJobsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
@@ -38,7 +37,9 @@ class _MyDeliveryJobsScreenState extends State<MyDeliveryJobsScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DeliveryProvider>().loadMyJobs();
+      final provider = context.read<DeliveryProvider>();
+      provider.startDriverJobsStream();
+      provider.loadDriverJobs();
     });
   }
 
@@ -50,17 +51,16 @@ class _MyDeliveryJobsScreenState extends State<MyDeliveryJobsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final currentUid =
-        FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final provider = context.watch<DeliveryProvider>();
-    final myJobs = provider.myJobs;
+    final driverJobs = provider.driverJobs;
 
-    final activeJobs = myJobs.where((j) {
+    final activeJobs = driverJobs.where((j) {
       return j.jobStatus != DeliveryJobStatuses.completed &&
           j.jobStatus != DeliveryJobStatuses.cancelled;
     }).toList();
 
-    final pastJobs = myJobs.where((j) {
+    final pastJobs = driverJobs.where((j) {
       return j.jobStatus == DeliveryJobStatuses.completed ||
           j.jobStatus == DeliveryJobStatuses.cancelled;
     }).toList();
@@ -71,7 +71,7 @@ class _MyDeliveryJobsScreenState extends State<MyDeliveryJobsScreen>
         backgroundColor: _kPurple,
         foregroundColor: Colors.white,
         title: const Text(
-          'My Posted Jobs',
+          'My Driver Jobs',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         elevation: 0,
@@ -91,7 +91,7 @@ class _MyDeliveryJobsScreenState extends State<MyDeliveryJobsScreen>
           ],
         ),
       ),
-      body: provider.isLoading && myJobs.isEmpty
+      body: provider.isLoading && driverJobs.isEmpty
           ? const Center(
               child: CircularProgressIndicator(color: _kPurple),
             )
@@ -100,29 +100,16 @@ class _MyDeliveryJobsScreenState extends State<MyDeliveryJobsScreen>
               children: [
                 _JobList(
                   jobs: activeJobs,
-                  emptyMessage: 'No active jobs. Post one!',
+                  emptyMessage: 'No active assigned jobs.',
                   currentUid: currentUid,
                 ),
                 _JobList(
                   jobs: pastJobs,
-                  emptyMessage: 'No past jobs yet.',
+                  emptyMessage: 'No past assigned jobs yet.',
                   currentUid: currentUid,
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _kPurple,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Post Job',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const PostJobScreen()),
-        ).then((_) => context.read<DeliveryProvider>().loadMyJobs()),
-      ),
     );
   }
 }
@@ -163,12 +150,12 @@ class _JobList extends StatelessWidget {
 
     return RefreshIndicator(
       color: _kPurple,
-      onRefresh: () => context.read<DeliveryProvider>().loadMyJobs(),
+      onRefresh: () => context.read<DeliveryProvider>().loadDriverJobs(),
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: jobs.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) => _MyJobCard(
+        itemBuilder: (context, i) => _DriverJobCard(
           job: jobs[i],
           currentUid: currentUid,
         ),
@@ -177,8 +164,8 @@ class _JobList extends StatelessWidget {
   }
 }
 
-class _MyJobCard extends StatelessWidget {
-  const _MyJobCard({required this.job, required this.currentUid});
+class _DriverJobCard extends StatelessWidget {
+  const _DriverJobCard({required this.job, required this.currentUid});
 
   final DeliveryJobModel job;
   final String currentUid;
@@ -193,15 +180,21 @@ class _MyJobCard extends StatelessWidget {
     final (statusLabel, statusColor) = _statusInfo(job.jobStatus);
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => DeliveryJobDetailScreen(
-            job: job,
-            currentUid: currentUid,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DeliveryJobDetailScreen(
+              job: job,
+              currentUid: currentUid,
+            ),
           ),
-        ),
-      ).then((_) => context.read<DeliveryProvider>().loadMyJobs()),
+        ).then((_) {
+          if (context.mounted) {
+            context.read<DeliveryProvider>().loadDriverJobs();
+          }
+        });
+      },
       child: Container(
         decoration: BoxDecoration(
           color: _kCardBg,
@@ -308,9 +301,9 @@ class _MyJobCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  Text(
-                    'Tap to manage →',
-                    style: const TextStyle(
+                  const Text(
+                    'View Job Details →',
+                    style: TextStyle(
                       fontSize: 12,
                       color: _kPurple,
                       fontWeight: FontWeight.w500,
@@ -328,7 +321,7 @@ class _MyJobCard extends StatelessWidget {
   (String, Color) _statusInfo(String status) => switch (status) {
         DeliveryJobStatuses.open => ('Open', _kPurple),
         DeliveryJobStatuses.driverAssigned =>
-          ('Driver Assigned', const Color(0xFF0EA5E9)),
+          ('Assigned', const Color(0xFF0EA5E9)),
         DeliveryJobStatuses.inProgress =>
           ('In Progress', const Color(0xFF0EA5E9)),
         DeliveryJobStatuses.proofPending =>
@@ -338,8 +331,7 @@ class _MyJobCard extends StatelessWidget {
         DeliveryJobStatuses.completed => ('Completed', _kGreen),
         DeliveryJobStatuses.cancelled =>
           ('Cancelled', Colors.redAccent),
-        DeliveryJobStatuses.disputed =>
-          ('Disputed', Colors.orange),
+        DeliveryJobStatuses.disputed => ('Disputed', Colors.orange),
         _ => (status, _kTextSecondary),
       };
 }

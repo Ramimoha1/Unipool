@@ -290,4 +290,95 @@ class DeliveryService {
       throw Exception('Failed to assign driver: $error');
     }
   }
+
+  // ── Driver & Delivery Lifecycle Actions ───────────────────────────────────
+
+  /// Transitions the job status to `in_progress`.
+  /// Validates that the caller is the assigned driver.
+  Future<void> startDelivery(String jobId) async {
+    try {
+      final currentUid = _auth.currentUser!.uid;
+      final jobDoc = await _jobs.doc(jobId).get();
+      if (!jobDoc.exists) {
+        throw Exception('Delivery job not found.');
+      }
+      final data = jobDoc.data()!;
+      if ((data[AppFields.assignedDriverId] as String?) != currentUid) {
+        throw Exception('Only the assigned driver can start the delivery.');
+      }
+
+      await _jobs.doc(jobId).update({
+        AppFields.jobStatus: DeliveryJobStatuses.inProgress,
+        AppFields.updatedAt: Timestamp.now(),
+      });
+    } catch (error) {
+      throw Exception('Failed to start delivery: $error');
+    }
+  }
+
+  /// Loads jobs assigned to a specific driver.
+  Future<List<DeliveryJobModel>> getDriverJobs(String driverId) async {
+    try {
+      final snapshot = await _jobs
+          .where(AppFields.assignedDriverId, isEqualTo: driverId)
+          .orderBy(AppFields.createdAt, descending: true)
+          .get();
+      return snapshot.docs
+          .map((doc) => DeliveryJobModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (error) {
+      throw Exception('Failed to load driver jobs: $error');
+    }
+  }
+
+  /// Streams jobs assigned to a specific driver.
+  Stream<List<DeliveryJobModel>> getDriverJobsStream(String driverId) {
+    try {
+      return _jobs
+          .where(AppFields.assignedDriverId, isEqualTo: driverId)
+          .orderBy(AppFields.createdAt, descending: true)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => DeliveryJobModel.fromMap(doc.data(), doc.id))
+                .toList(),
+          );
+    } catch (error) {
+      throw Exception('Failed to stream driver jobs: $error');
+    }
+  }
+
+  /// Transitions the job status to `completed`.
+  /// Validates that the caller is the seller.
+  Future<void> completeJob(String jobId) async {
+    try {
+      final currentUid = _auth.currentUser!.uid;
+      final jobDoc = await _jobs.doc(jobId).get();
+      if (!jobDoc.exists) {
+        throw Exception('Delivery job not found.');
+      }
+      final data = jobDoc.data()!;
+      if ((data[AppFields.sellerId] as String?) != currentUid) {
+        throw Exception('Only the seller can mark the job as completed.');
+      }
+
+      await _jobs.doc(jobId).update({
+        AppFields.jobStatus: DeliveryJobStatuses.completed,
+        AppFields.updatedAt: Timestamp.now(),
+      });
+
+      // Notify the driver
+      final driverId = data[AppFields.assignedDriverId] as String? ?? '';
+      if (driverId.isNotEmpty) {
+        await _notificationService.sendFCMToUser(
+          driverId,
+          'Delivery Completed',
+          'The seller has marked your delivery job as completed.',
+        );
+      }
+    } catch (error) {
+      throw Exception('Failed to complete delivery job: $error');
+    }
+  }
 }
+

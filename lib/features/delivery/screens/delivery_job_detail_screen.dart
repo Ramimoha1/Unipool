@@ -10,6 +10,10 @@ import '../models/delivery_application_model.dart';
 import '../models/delivery_job_model.dart';
 import '../providers/delivery_provider.dart';
 import 'delivery_chat_screen.dart';
+import '../services/delivery_service.dart';
+import '../services/delivery_proof_service.dart';
+import '../providers/delivery_proof_provider.dart';
+import '../models/delivery_proof_model.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _kPurple = Color(0xFF7C3AED);
@@ -69,240 +73,492 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final job = widget.job;
-    final stops = job.deliveryStops;
-    final stopLabels = stops
-        .map((s) => (s['label'] as String?) ?? '')
-        .where((l) => l.isNotEmpty)
-        .join(' • ');
-    final timeText =
-        '${DateFormat('h:mm a').format(job.timeWindowStart)} – '
-        '${DateFormat('h:mm a').format(job.timeWindowEnd)}';
-    final sellerInitials = _initials(job.sellerId);
-    final provider = context.watch<DeliveryProvider>();
+    return StreamBuilder<DeliveryJobModel>(
+      stream: DeliveryService().getJobById(widget.job.id),
+      initialData: widget.job,
+      builder: (context, snapshot) {
+        final job = snapshot.data ?? widget.job;
+        final stops = job.deliveryStops;
+        final stopLabels = stops
+            .map((s) => (s['label'] as String?) ?? '')
+            .where((l) => l.isNotEmpty)
+            .join(' • ');
+        final timeText =
+            '${DateFormat('h:mm a').format(job.timeWindowStart)} – '
+            '${DateFormat('h:mm a').format(job.timeWindowEnd)}';
+        final sellerInitials = _initials(job.sellerId);
+        final provider = context.watch<DeliveryProvider>();
 
-    return Scaffold(
-      backgroundColor: _kSurface,
-      appBar: AppBar(
-        backgroundColor: _kPurple,
-        foregroundColor: Colors.white,
-        title: const Text(
-          'Delivery Details',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        elevation: 0,
-        actions: [
-          if (_isSeller)
-            IconButton(
-              icon: const Icon(Icons.people_outline),
-              tooltip: 'Applicants',
-              onPressed: () => _showApplicantsSheet(context, provider),
+        return Scaffold(
+          backgroundColor: _kSurface,
+          appBar: AppBar(
+            backgroundColor: _kPurple,
+            foregroundColor: Colors.white,
+            title: const Text(
+              'Delivery Details',
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
-        children: [
-          // ── Main Info Card ──
-          Container(
-            decoration: BoxDecoration(
-              color: _kCardBg,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
+            elevation: 0,
+            actions: [
+              if (_isSeller)
+                IconButton(
+                  icon: const Icon(Icons.people_outline),
+                  tooltip: 'Applicants',
+                  onPressed: () => _showApplicantsSheet(context, provider),
                 ),
-              ],
-            ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title + price
-                Row(
+            ],
+          ),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+            children: [
+              // ── Main Info Card ──
+              Container(
+                decoration: BoxDecoration(
+                  color: _kCardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: _kPurpleLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.inventory_2_outlined,
-                          color: _kPurple, size: 22),
+                    // Title + price
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: _kPurpleLight,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.inventory_2_outlined,
+                              color: _kPurple, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '${job.title} (${job.quantity} ${job.quantity == 1 ? 'item' : 'items'})',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: _kTextPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _PriceBadge(price: job.price),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '${job.title} (${job.quantity} ${job.quantity == 1 ? 'item' : 'items'})',
-                        style: const TextStyle(
-                          fontSize: 17,
+                    const SizedBox(height: 20),
+
+                    // Route timeline
+                    _RouteTimeline(
+                      pickupLabel: job.pickupLabel,
+                      stopLabels: stopLabels,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Time window
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time_outlined,
+                            size: 16, color: _kTextSecondary),
+                        const SizedBox(width: 8),
+                        Text(
+                          timeText,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: _kTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(color: _kDivider, height: 1),
+                    const SizedBox(height: 16),
+
+                    // Seller info
+                    _SellerRow(uid: job.sellerId, initials: sellerInitials),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── Status Badge (if not open) ──
+              if (job.jobStatus != DeliveryJobStatuses.open)
+                _StatusCard(status: job.jobStatus),
+
+              // ── Seller view: Proof review card ──
+              if (_isSeller && job.jobStatus == DeliveryJobStatuses.proofPending) ...[
+                const SizedBox(height: 16),
+                StreamBuilder<List<DeliveryProofModel>>(
+                  stream: DeliveryProofService().getProofs(job.id),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: _kPurple));
+                    }
+                    final proofs = snap.data ?? [];
+                    if (proofs.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    final proof = proofs.first; // Get latest proof
+
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: _kCardBg,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _kDivider),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.assignment_turned_in_outlined, color: _kPurple, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Submitted Proof',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: _kTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (proof.notes.isNotEmpty) ...[
+                            const Text(
+                              'Driver Notes:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _kTextSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              proof.notes,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: _kTextPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          if (proof.photoUrls.isNotEmpty) ...[
+                            const Text(
+                              'Photo URLs:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _kTextSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            ...proof.photoUrls.map((url) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                url,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: _kPurple,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            )),
+                            const SizedBox(height: 12),
+                          ],
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.redAccent,
+                                    side: const BorderSide(color: Colors.redAccent),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    final proofProvider = context.read<DeliveryProofProvider>();
+                                    final deliveryProvider = context.read<DeliveryProvider>();
+                                    final confirm = await _showConfirmReview(context, false);
+                                    if (confirm == true) {
+                                      await proofProvider.reviewProof(
+                                        job.id,
+                                        proof.id,
+                                        status: DeliveryProofStatuses.rejected,
+                                        reviewerId: widget.currentUid,
+                                      );
+                                      // Revert job status back to inProgress
+                                      await deliveryProvider.updateJobStatus(
+                                        job.id,
+                                        DeliveryJobStatuses.inProgress,
+                                      );
+                                    }
+                                  },
+                                  child: const Text('Reject Proof'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: _kGreen,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    final proofProvider = context.read<DeliveryProofProvider>();
+                                    final confirm = await _showConfirmReview(context, true);
+                                    if (confirm == true) {
+                                      await proofProvider.reviewProof(
+                                        job.id,
+                                        proof.id,
+                                        status: DeliveryProofStatuses.approved,
+                                        reviewerId: widget.currentUid,
+                                      );
+                                    }
+                                  },
+                                  child: const Text('Approve Proof'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+
+              // ── Seller view: Mark completed button ──
+              if (_isSeller && job.jobStatus == DeliveryJobStatuses.awaitingPayment) ...[
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: _kCardBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kDivider),
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Awaiting Payment',
+                        style: TextStyle(
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: _kTextPrimary,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    _PriceBadge(price: job.price),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Route timeline
-                _RouteTimeline(
-                  pickupLabel: job.pickupLabel,
-                  stopLabels: stopLabels,
-                ),
-                const SizedBox(height: 14),
-
-                // Time window
-                Row(
-                  children: [
-                    const Icon(Icons.access_time_outlined,
-                        size: 16, color: _kTextSecondary),
-                    const SizedBox(width: 8),
-                    Text(
-                      timeText,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: _kTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(color: _kDivider, height: 1),
-                const SizedBox(height: 16),
-
-                // Seller info
-                _SellerRow(uid: job.sellerId, initials: sellerInitials),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Status Badge (if not open) ──
-          if (job.jobStatus != DeliveryJobStatuses.open)
-            _StatusCard(status: job.jobStatus),
-
-          // ── Seller: view applicants in-line summary ──
-          if (_isSeller) ...[
-            const SizedBox(height: 16),
-            _SellerActionsCard(
-              job: job,
-              provider: provider,
-              onViewApplicants: () =>
-                  _showApplicantsSheet(context, provider),
-            ),
-          ],
-
-          // ── If seller: Chat with assigned driver ──
-          if (_isSeller && job.assignedDriverId.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _ChatTile(
-              label: 'Chat with Driver',
-              icon: Icons.chat_bubble_outline,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DeliveryChatScreen(
-                    jobId: job.id,
-                    currentUid: widget.currentUid,
-                    otherUid: job.assignedDriverId,
-                    otherLabel: 'Driver',
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-
-      // ── Bottom CTA ──
-      bottomNavigationBar: _isSeller
-          ? const SizedBox.shrink()
-          : Container(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                12,
-                16,
-                16 + MediaQuery.of(context).padding.bottom,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(15),
-                    blurRadius: 16,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: StreamBuilder<DeliveryApplicationModel?>(
-                stream: _myApplicationStream(),
-                builder: (context, snap) {
-                  final myApp = snap.data;
-                  final alreadyApplied =
-                      myApp != null || _justApplied;
-                  final status = myApp?.status ?? '';
-
-                  String label;
-                  Color btnColor;
-                  bool enabled;
-
-                  if (status == DeliveryApplicationStatuses.approved) {
-                    label = '✓ Application Accepted';
-                    btnColor = _kGreen;
-                    enabled = false;
-                  } else if (alreadyApplied) {
-                    label = 'Application Submitted';
-                    btnColor = _kTextSecondary;
-                    enabled = false;
-                  } else if (job.jobStatus != DeliveryJobStatuses.open) {
-                    label = 'Job No Longer Available';
-                    btnColor = _kTextSecondary;
-                    enabled = false;
-                  } else {
-                    label = 'Apply for This Job';
-                    btnColor = _kPurple;
-                    enabled = true;
-                  }
-
-                  return SizedBox(
-                    height: 52,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: btnColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'The proof was approved. Once you have settled payment with the driver, please mark the job as completed.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _kTextSecondary,
                         ),
                       ),
-                      onPressed: (enabled && !_applying) ? _applyToJob : null,
-                      child: _applying
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              label,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                              ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _kPurple,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
+                          ),
+                          onPressed: () async {
+                            final deliveryProvider = context.read<DeliveryProvider>();
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                                title: const Text('Complete Job'),
+                                content: const Text(
+                                    'Are you sure you want to mark this job as completed?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: _kPurple,
+                                    ),
+                                    child: const Text('Complete'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              await deliveryProvider.completeJob(job.id);
+                            }
+                          },
+                          child: const Text('Mark as Completed'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // ── Seller: view applicants in-line summary ──
+              if (_isSeller) ...[
+                const SizedBox(height: 16),
+                _SellerActionsCard(
+                  job: job,
+                  provider: provider,
+                  onViewApplicants: () =>
+                      _showApplicantsSheet(context, provider),
+                ),
+              ],
+
+              // ── If seller: Chat with assigned driver ──
+              if (_isSeller && job.assignedDriverId.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _ChatTile(
+                  label: 'Chat with Driver',
+                  icon: Icons.chat_bubble_outline,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DeliveryChatScreen(
+                        jobId: job.id,
+                        currentUid: widget.currentUid,
+                        otherUid: job.assignedDriverId,
+                        otherLabel: 'Driver',
+                      ),
                     ),
-                  );
-                },
-              ),
-            ),
+                  ),
+                ),
+              ],
+
+              // ── If driver: Chat with seller ──
+              if (!_isSeller && job.assignedDriverId == widget.currentUid) ...[
+                const SizedBox(height: 12),
+                _ChatTile(
+                  label: 'Chat with Seller',
+                  icon: Icons.chat_bubble_outline,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DeliveryChatScreen(
+                        jobId: job.id,
+                        currentUid: widget.currentUid,
+                        otherUid: job.sellerId,
+                        otherLabel: 'Seller',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+
+          // ── Bottom CTA ──
+          bottomNavigationBar: _isSeller
+              ? const SizedBox.shrink()
+              : (job.assignedDriverId == widget.currentUid)
+                  ? _buildAssignedDriverCTA(context, job)
+                  : Container(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        12,
+                        16,
+                        16 + MediaQuery.of(context).padding.bottom,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(15),
+                            blurRadius: 16,
+                            offset: const Offset(0, -4),
+                          ),
+                        ],
+                      ),
+                      child: StreamBuilder<DeliveryApplicationModel?>(
+                        stream: _myApplicationStream(),
+                        builder: (context, snap) {
+                          final myApp = snap.data;
+                          final alreadyApplied =
+                              myApp != null || _justApplied;
+                          final status = myApp?.status ?? '';
+
+                          String label;
+                          Color btnColor;
+                          bool enabled;
+
+                          if (status == DeliveryApplicationStatuses.approved) {
+                            label = '✓ Application Accepted';
+                            btnColor = _kGreen;
+                            enabled = false;
+                          } else if (alreadyApplied) {
+                            label = 'Application Submitted';
+                            btnColor = _kTextSecondary;
+                            enabled = false;
+                          } else if (job.jobStatus != DeliveryJobStatuses.open) {
+                            label = 'Job No Longer Available';
+                            btnColor = _kTextSecondary;
+                            enabled = false;
+                          } else {
+                            label = 'Apply for This Job';
+                            btnColor = _kPurple;
+                            enabled = true;
+                          }
+
+                          return SizedBox(
+                            height: 52,
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: btnColor,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: (enabled && !_applying) ? _applyToJob : null,
+                              child: _applying
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      label,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+        );
+      },
     );
   }
 
@@ -318,6 +574,223 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
       final doc = snap.docs.first;
       return DeliveryApplicationModel.fromMap(doc.data(), doc.id);
     });
+  }
+
+  Future<bool?> _showConfirmReview(BuildContext context, bool approve) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(approve ? 'Approve Proof' : 'Reject Proof'),
+        content: Text(approve
+            ? 'Are you sure you want to approve this proof? This will move the job status to Awaiting Payment.'
+            : 'Are you sure you want to reject this proof? This will revert the job status to In Progress so the driver can resubmit.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              foregroundColor: approve ? _kGreen : Colors.redAccent,
+            ),
+            child: Text(approve ? 'Approve' : 'Reject'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssignedDriverCTA(BuildContext context, DeliveryJobModel job) {
+    String label;
+    Color btnColor;
+    bool enabled;
+    VoidCallback? onPressed;
+
+    switch (job.jobStatus) {
+      case DeliveryJobStatuses.driverAssigned:
+        label = 'Start Delivery';
+        btnColor = _kPurple;
+        enabled = true;
+        onPressed = () async {
+          final deliveryProvider = context.read<DeliveryProvider>();
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Start Delivery'),
+              content: const Text('Are you sure you want to start this delivery?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: TextButton.styleFrom(foregroundColor: _kPurple),
+                  child: const Text('Start'),
+                ),
+              ],
+            ),
+          );
+          if (confirm == true) {
+            await deliveryProvider.startDelivery(job.id);
+          }
+        };
+        break;
+      case DeliveryJobStatuses.inProgress:
+        label = 'Submit Proof';
+        btnColor = _kPurple;
+        enabled = true;
+        onPressed = () => _showSubmitProofDialog(context, job.id);
+        break;
+      case DeliveryJobStatuses.proofPending:
+        label = 'Proof Pending Seller Review';
+        btnColor = const Color(0xFFF59E0B);
+        enabled = false;
+        break;
+      case DeliveryJobStatuses.awaitingPayment:
+        label = 'Awaiting Payment';
+        btnColor = const Color(0xFFF59E0B);
+        enabled = false;
+        break;
+      case DeliveryJobStatuses.completed:
+        label = '✓ Delivery Completed';
+        btnColor = _kGreen;
+        enabled = false;
+        break;
+      case DeliveryJobStatuses.cancelled:
+        label = 'Job Cancelled';
+        btnColor = Colors.redAccent;
+        enabled = false;
+        break;
+      default:
+        label = 'Assigned to You';
+        btnColor = _kTextSecondary;
+        enabled = false;
+    }
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        16 + MediaQuery.of(context).padding.bottom,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(15),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        height: 52,
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: btnColor,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: enabled ? onPressed : null,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSubmitProofDialog(BuildContext context, String jobId) {
+    final notesController = TextEditingController();
+    final photoUrlController = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Submit Delivery Proof'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notes (e.g., Left at reception)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: photoUrlController,
+              decoration: const InputDecoration(
+                labelText: 'Photo URL (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final notes = notesController.text.trim();
+              final url = photoUrlController.text.trim();
+              if (notes.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter notes.')),
+                );
+                return;
+              }
+
+              final proof = DeliveryProofModel(
+                id: '',
+                driverId: widget.currentUid,
+                stopIndex: null,
+                photoUrls: url.isNotEmpty ? [url] : [],
+                notes: notes,
+                status: DeliveryProofStatuses.submitted,
+                reviewedBy: '',
+                reviewedAt: null,
+                createdAt: DateTime.now(),
+              );
+
+              try {
+                await context.read<DeliveryProofProvider>().submitProof(jobId, proof);
+                if (context.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Proof submitted successfully!')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to submit proof: $e')),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: _kPurple),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showApplicantsSheet(
@@ -680,6 +1153,7 @@ class _SellerActionsCard extends StatelessWidget {
               onTap: provider.isLoading
                   ? null
                   : () async {
+                      final deliveryProvider = context.read<DeliveryProvider>();
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
@@ -703,7 +1177,7 @@ class _SellerActionsCard extends StatelessWidget {
                         ),
                       );
                       if (confirm != true) return;
-                      await context.read<DeliveryProvider>().updateJobStatus(
+                      await deliveryProvider.updateJobStatus(
                             job.id,
                             DeliveryJobStatuses.cancelled,
                           );
@@ -840,7 +1314,7 @@ class _ApplicantsSheet extends StatelessWidget {
                   child: ListView.separated(
                     controller: scrollController,
                     itemCount: apps.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, i) => _ApplicantCard(
                       application: apps[i],
                       jobId: jobId,

@@ -158,7 +158,7 @@ class _DeliveryJobsScreenState extends State<DeliveryJobsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               sliver: SliverList.separated(
                 itemCount: jobs.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, i) => _JobCard(
                   job: jobs[i],
                   onTap: () => Navigator.push(
