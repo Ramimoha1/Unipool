@@ -89,6 +89,8 @@ class AppFields {
   static const pickupLng = 'pickup_lng';
   static const deliveryStops = 'delivery_stops';
   static const deliveryTime = 'delivery_time';
+  static const timeWindowStart = 'time_window_start';
+  static const timeWindowEnd = 'time_window_end';
   static const items = 'items';
   static const quantity = 'quantity';
   static const price = 'price';

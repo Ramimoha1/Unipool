@@ -12,6 +12,8 @@ class DeliveryJobModel {
     required this.pickupLng,
     required this.deliveryStops,
     required this.deliveryTime,
+    required this.timeWindowStart,
+    required this.timeWindowEnd,
     required this.items,
     required this.quantity,
     required this.price,
@@ -32,6 +34,8 @@ class DeliveryJobModel {
   final double pickupLng;
   final List<Map<String, dynamic>> deliveryStops;
   final DateTime deliveryTime;
+  final DateTime timeWindowStart;
+  final DateTime timeWindowEnd;
   final List<Map<String, dynamic>> items;
   final int quantity;
   final double price;
@@ -56,6 +60,10 @@ class DeliveryJobModel {
           .toList(),
       deliveryTime:
           (map[AppFields.deliveryTime] as Timestamp?)?.toDate() ?? DateTime.now(),
+      timeWindowStart:
+          (map[AppFields.timeWindowStart] as Timestamp?)?.toDate() ?? DateTime.now(),
+      timeWindowEnd:
+          (map[AppFields.timeWindowEnd] as Timestamp?)?.toDate() ?? DateTime.now(),
       items: (map[AppFields.items] as List<dynamic>? ?? const [])
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList(),
@@ -85,6 +93,8 @@ class DeliveryJobModel {
       AppFields.pickupLng: pickupLng,
       AppFields.deliveryStops: deliveryStops,
       AppFields.deliveryTime: Timestamp.fromDate(deliveryTime),
+      AppFields.timeWindowStart: Timestamp.fromDate(timeWindowStart),
+      AppFields.timeWindowEnd: Timestamp.fromDate(timeWindowEnd),
       AppFields.items: items,
       AppFields.quantity: quantity,
       AppFields.price: price,
@@ -107,6 +117,8 @@ class DeliveryJobModel {
     double? pickupLng,
     List<Map<String, dynamic>>? deliveryStops,
     DateTime? deliveryTime,
+    DateTime? timeWindowStart,
+    DateTime? timeWindowEnd,
     List<Map<String, dynamic>>? items,
     int? quantity,
     double? price,
@@ -127,6 +139,8 @@ class DeliveryJobModel {
       pickupLng: pickupLng ?? this.pickupLng,
       deliveryStops: deliveryStops ?? this.deliveryStops,
       deliveryTime: deliveryTime ?? this.deliveryTime,
+      timeWindowStart: timeWindowStart ?? this.timeWindowStart,
+      timeWindowEnd: timeWindowEnd ?? this.timeWindowEnd,
       items: items ?? this.items,
       quantity: quantity ?? this.quantity,
       price: price ?? this.price,

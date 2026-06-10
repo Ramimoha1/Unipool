@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:unipool/features/carpool/screens/map_screen.dart';
+import 'package:unipool/core/widgets/app_bottom_nav.dart';
 import '../data/driver_verification_repository.dart';
 import 'apply_driver_screen.dart';
 import 'package:unipool/features/profile/presentation/account_settings_screen.dart';
@@ -89,7 +89,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         },
       ),
-      bottomNavigationBar: _BottomNav(currentIndex: 2),
+      bottomNavigationBar: const AppBottomNav(currentIndex: 2),
     );
   }
 
@@ -675,58 +675,4 @@ class _ActionRow extends StatelessWidget {
     );
   }
 }
-
-// ─── Bottom Navigation ────────────────────────────────────────────────────────
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.currentIndex});
-  final int currentIndex;
-
-  static const Color _teal = Color(0xFF1A9B8A);
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      selectedItemColor: _teal,
-      unselectedItemColor: const Color(0xFF8A96A3),
-      selectedLabelStyle:
-          const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5),
-      unselectedLabelStyle: const TextStyle(fontSize: 11.5),
-      backgroundColor: Colors.white,
-      elevation: 8,
-      items: const [
-        BottomNavigationBarItem(
-            icon: Icon(Icons.directions_car_outlined),
-            activeIcon: Icon(Icons.directions_car),
-            label: 'Carpool'),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            activeIcon: Icon(Icons.inventory_2),
-            label: 'Delivery'),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile'),
-      ],
-      onTap: (index) {
-        if (index == currentIndex) {
-          return;
-        }
-
-        if (index == 0) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MapScreen()),
-          );
-          return;
-        }
-
-        if (index == 1) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Delivery module is not wired yet.')),
-          );
-        }
-      },
-    );
-  }
-}
+
