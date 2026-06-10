@@ -1,9 +1,12 @@
 // Hallmark · pre-emit critique: P4 H4 E5 S4 R4 V4
 // Screen: Delivery Chat (Seller ↔ Driver real-time messaging)
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:unipool/core/constants.dart';
 import '../models/delivery_chat_message_model.dart';
 import '../services/delivery_chat_service.dart';
 
@@ -38,6 +41,30 @@ class _DeliveryChatScreenState extends State<DeliveryChatScreen> {
   final _scrollController = ScrollController();
   final _chatService = DeliveryChatService();
   bool _sending = false;
+  String _senderName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSenderName();
+  }
+
+  Future<void> _loadSenderName() async {
+    final uid = widget.currentUid;
+    if (uid.isEmpty) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection(AppCollections.users)
+          .doc(uid)
+          .get();
+      final name = (doc.data()?[AppFields.userFullName] as String?)?.trim();
+      if (mounted && name != null && name.isNotEmpty) {
+        setState(() => _senderName = name);
+      }
+    } catch (_) {
+      // Fall back to UID if lookup fails — non-critical
+    }
+  }
 
   @override
   void dispose() {
@@ -71,7 +98,10 @@ class _DeliveryChatScreenState extends State<DeliveryChatScreen> {
         DeliveryChatMessageModel(
           id: '',
           senderId: widget.currentUid,
-          senderName: widget.currentUid,
+          senderName: _senderName.isNotEmpty
+              ? _senderName
+              : FirebaseAuth.instance.currentUser?.displayName ??
+                  widget.currentUid,
           content: text,
           sentAt: DateTime.now(),
         ),
@@ -354,9 +384,11 @@ class _MessageBubble extends StatelessWidget {
               radius: 14,
               backgroundColor: _kPurpleLight,
               child: Text(
-                message.senderId.isNotEmpty
-                    ? message.senderId.substring(0, 1).toUpperCase()
-                    : '?',
+                message.senderName.isNotEmpty
+                    ? message.senderName.substring(0, 1).toUpperCase()
+                    : message.senderId.isNotEmpty
+                        ? message.senderId.substring(0, 1).toUpperCase()
+                        : '?',
                 style: const TextStyle(
                   color: _kPurple,
                   fontSize: 10,

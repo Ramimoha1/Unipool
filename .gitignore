@@ -52,3 +52,5 @@ repomix-output.xml
 .env.*
 !.env.example
 /functions/node_modules
+
+implementation_plan.md
