@@ -397,7 +397,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                       ),
                                     )
                                   : const Text('End Ride'),
-ee                            ),
+                            ),
                           ),
                         ],
                       ],
