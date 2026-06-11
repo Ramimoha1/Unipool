@@ -20,8 +20,16 @@ class DeliveryProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
 
+  List<DeliveryJobModel> _assignedJobs = [];
+  List<DeliveryJobModel> _rejectedJobs = [];
+
   StreamSubscription<List<DeliveryJobModel>>? _openJobsSubscription;
   StreamSubscription<List<DeliveryJobModel>>? _driverJobsSubscription;
+
+  void _updateDriverJobs() {
+    driverJobs = [..._assignedJobs, ..._rejectedJobs];
+    notifyListeners();
+  }
 
   void startOpenJobsStream() {
     _openJobsSubscription?.cancel();
@@ -188,6 +196,8 @@ class DeliveryProvider extends ChangeNotifier {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       driverJobs = [];
+      _assignedJobs = [];
+      _rejectedJobs = [];
       notifyListeners();
       return;
     }
@@ -196,9 +206,13 @@ class DeliveryProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final assignedJobs = await _service.getDriverJobs(user.uid);
-      final rejectedJobs = await _service.getRejectedDriverJobs(user.uid);
-      driverJobs = [...assignedJobs, ...rejectedJobs];
+      _assignedJobs = await _service.getDriverJobs(user.uid);
+      try {
+        _rejectedJobs = await _service.getRejectedDriverJobs(user.uid);
+      } catch (_) {
+        _rejectedJobs = [];
+      }
+      _updateDriverJobs();
     } catch (exception) {
       error = exception.toString();
     } finally {
@@ -214,8 +228,8 @@ class DeliveryProvider extends ChangeNotifier {
     _driverJobsSubscription?.cancel();
     _driverJobsSubscription = _service.getDriverJobsStream(user.uid).listen(
       (items) {
-        driverJobs = items;
-        notifyListeners();
+        _assignedJobs = items;
+        _updateDriverJobs();
       },
       onError: (exception) {
         error = exception.toString();

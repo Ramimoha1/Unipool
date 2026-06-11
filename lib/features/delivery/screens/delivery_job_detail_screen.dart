@@ -14,6 +14,11 @@ import '../services/delivery_service.dart';
 import '../services/delivery_proof_service.dart';
 import '../providers/delivery_proof_provider.dart';
 import '../models/delivery_proof_model.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:typed_data';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _kPurple = Color(0xFF7C3AED);
@@ -159,6 +164,19 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                     ),
                     const SizedBox(height: 20),
 
+                    if (job.items.isNotEmpty && job.items.first['photo_url'] != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          job.items.first['photo_url'] as String,
+                          width: double.infinity,
+                          height: 180,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
                     // Route timeline
                     _RouteTimeline(
                       pickupLabel: job.pickupLabel,
@@ -257,26 +275,25 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                           ],
                           if (proof.photoUrls.isNotEmpty) ...[
                             const Text(
-                              'Photo URLs:',
+                              'Submitted Photo:',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: _kTextSecondary,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 8),
                             ...proof.photoUrls.map((url) => Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Text(
-                                url,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: _kPurple,
-                                  decoration: TextDecoration.underline,
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  url,
+                                  width: MediaQuery.of(context).size.width / 3,
+                                  fit: BoxFit.contain,
                                 ),
                               ),
                             )),
-                            const SizedBox(height: 12),
                           ],
                           Row(
                             children: [
@@ -507,11 +524,17 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                           Color btnColor;
                           bool enabled;
 
-                          if (status == DeliveryApplicationStatuses.approved) {
+                          final effectiveStatus = _justApplied ? DeliveryApplicationStatuses.pending : status;
+
+                          if (effectiveStatus == DeliveryApplicationStatuses.approved) {
                             label = '✓ Application Accepted';
                             btnColor = _kGreen;
                             enabled = false;
-                          } else if (alreadyApplied) {
+                          } else if (effectiveStatus == DeliveryApplicationStatuses.rejected) {
+                            label = 'Application Rejected. Apply Again?';
+                            btnColor = Colors.redAccent;
+                            enabled = true;
+                          } else if (alreadyApplied && effectiveStatus == DeliveryApplicationStatuses.pending) {
                             label = 'Application Submitted';
                             btnColor = _kTextSecondary;
                             enabled = false;
@@ -712,83 +735,12 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
   }
 
   void _showSubmitProofDialog(BuildContext context, String jobId) {
-    final notesController = TextEditingController();
-    final photoUrlController = TextEditingController();
-
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Submit Delivery Proof'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: notesController,
-              decoration: const InputDecoration(
-                labelText: 'Notes (e.g., Left at reception)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: photoUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Photo URL (optional)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final notes = notesController.text.trim();
-              final url = photoUrlController.text.trim();
-              if (notes.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter notes.')),
-                );
-                return;
-              }
-
-              final proof = DeliveryProofModel(
-                id: '',
-                driverId: widget.currentUid,
-                stopIndex: null,
-                photoUrls: url.isNotEmpty ? [url] : [],
-                notes: notes,
-                status: DeliveryProofStatuses.submitted,
-                reviewedBy: '',
-                reviewedAt: null,
-                createdAt: DateTime.now(),
-              );
-
-              try {
-                await context.read<DeliveryProofProvider>().submitProof(jobId, proof);
-                if (context.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Proof submitted successfully!')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to submit proof: $e')),
-                  );
-                }
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: _kPurple),
-            child: const Text('Submit'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (ctx) => _SubmitProofDialog(
+        jobId: jobId,
+        currentUid: widget.currentUid,
       ),
     );
   }
@@ -813,6 +765,203 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
   String _initials(String uid) {
     if (uid.isEmpty) return '?';
     return uid.substring(0, 1).toUpperCase();
+  }
+}
+
+// ─── Submit Proof Dialog ──────────────────────────────────────────────────────
+
+class _SubmitProofDialog extends StatefulWidget {
+  const _SubmitProofDialog({
+    required this.jobId,
+    required this.currentUid,
+  });
+
+  final String jobId;
+  final String currentUid;
+
+  @override
+  State<_SubmitProofDialog> createState() => _SubmitProofDialogState();
+}
+
+class _SubmitProofDialogState extends State<_SubmitProofDialog> {
+  final _notesController = TextEditingController();
+  XFile? _pickedFile;
+  bool _isSubmitting = false;
+
+  Future<void> _takePhoto() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.camera);
+    if (picked != null) {
+      setState(() {
+        _pickedFile = picked;
+      });
+    }
+  }
+
+  Future<void> _uploadPhoto() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() {
+        _pickedFile = picked;
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    final notes = _notesController.text.trim();
+    if (_pickedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please take or upload a photo for proof.')),
+      );
+      return;
+    }
+    if (notes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter notes.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final provider = context.read<DeliveryProofProvider>();
+
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('delivery_proofs')
+          .child(widget.jobId)
+          .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      if (kIsWeb) {
+        final bytes = await _pickedFile!.readAsBytes();
+        await storageRef.putData(bytes);
+      } else {
+        await storageRef.putFile(File(_pickedFile!.path));
+      }
+      final photoUrl = await storageRef.getDownloadURL();
+
+      final proof = DeliveryProofModel(
+        id: '',
+        driverId: widget.currentUid,
+        stopIndex: null,
+        photoUrls: [photoUrl],
+        notes: notes,
+        status: DeliveryProofStatuses.submitted,
+        reviewedBy: '',
+        reviewedAt: null,
+        createdAt: DateTime.now(),
+      );
+
+      await provider.submitProof(widget.jobId, proof);
+      
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Proof submitted successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit proof: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Submit Delivery Proof'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _notesController,
+            decoration: const InputDecoration(
+              labelText: 'Notes (e.g., Left at reception)',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            enabled: !_isSubmitting,
+          ),
+          const SizedBox(height: 16),
+          if (_pickedFile != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: kIsWeb
+                  ? Container(
+                      height: 120,
+                      width: double.infinity,
+                      color: _kPurple.withAlpha(20),
+                      child: const Center(
+                        child: Icon(Icons.check_circle, color: _kPurple, size: 48),
+                      ),
+                    )
+                  : Image.file(
+                      File(_pickedFile!.path),
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              if (!kIsWeb) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.camera_alt, size: 18),
+                    label: const Text('Camera'),
+                    onPressed: _isSubmitting ? null : _takePhoto,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.photo_library, size: 18),
+                  label: const Text(kIsWeb ? 'Choose Image' : 'Gallery'),
+                  onPressed: _isSubmitting ? null : _uploadPhoto,
+                ),
+              ),
+            ],
+          ),
+          if (_pickedFile == null)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'Photo is required',
+                style: TextStyle(color: Colors.redAccent, fontSize: 12),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _isSubmitting ? null : _submit,
+          style: TextButton.styleFrom(foregroundColor: _kPurple),
+          child: _isSubmitting 
+              ? const SizedBox(
+                  width: 16, height: 16, 
+                  child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple)
+                ) 
+              : const Text('Submit'),
+        ),
+      ],
+    );
   }
 }
 
@@ -1247,7 +1396,7 @@ class _ChatTile extends StatelessWidget {
 
 // ─── Applicants Bottom Sheet ──────────────────────────────────────────────────
 
-class _ApplicantsSheet extends StatelessWidget {
+class _ApplicantsSheet extends StatefulWidget {
   const _ApplicantsSheet({
     required this.jobId,
     required this.currentUid,
@@ -1257,13 +1406,23 @@ class _ApplicantsSheet extends StatelessWidget {
   final String currentUid;
 
   @override
+  State<_ApplicantsSheet> createState() => _ApplicantsSheetState();
+}
+
+class _ApplicantsSheetState extends State<_ApplicantsSheet> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<DeliveryProvider>().loadApplications(widget.jobId);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final provider = context.watch<DeliveryProvider>();
-
-    // Trigger load on first build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      provider.loadApplications(jobId);
-    });
 
     final allApps = provider.applications;
     final approvedApp = allApps.where((a) => a.status == DeliveryApplicationStatuses.approved).firstOrNull;
@@ -1319,8 +1478,8 @@ class _ApplicantsSheet extends StatelessWidget {
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, i) => _ApplicantCard(
                       application: apps[i],
-                      jobId: jobId,
-                      currentUid: currentUid,
+                      jobId: widget.jobId,
+                      currentUid: widget.currentUid,
                     ),
                   ),
                 ),
@@ -1335,7 +1494,7 @@ class _ApplicantsSheet extends StatelessWidget {
 
 // ─── Applicant Card ───────────────────────────────────────────────────────────
 
-class _ApplicantCard extends StatelessWidget {
+class _ApplicantCard extends StatefulWidget {
   const _ApplicantCard({
     required this.application,
     required this.jobId,
@@ -1347,12 +1506,28 @@ class _ApplicantCard extends StatelessWidget {
   final String currentUid;
 
   @override
+  State<_ApplicantCard> createState() => _ApplicantCardState();
+}
+
+class _ApplicantCardState extends State<_ApplicantCard> {
+  late Future<DocumentSnapshot<Map<String, dynamic>>> _userFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _userFuture = FirebaseFirestore.instance
+        .collection(AppCollections.users)
+        .doc(widget.application.driverId)
+        .get();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final provider = context.read<DeliveryProvider>();
     final isPending =
-        application.status == DeliveryApplicationStatuses.pending;
+        widget.application.status == DeliveryApplicationStatuses.pending;
     final isApproved =
-        application.status == DeliveryApplicationStatuses.approved;
+        widget.application.status == DeliveryApplicationStatuses.approved;
 
     return Container(
       decoration: BoxDecoration(
@@ -1371,16 +1546,13 @@ class _ApplicantCard extends StatelessWidget {
           Row(
             children: [
               FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                future: FirebaseFirestore.instance
-                    .collection(AppCollections.users)
-                    .doc(application.driverId)
-                    .get(),
+                future: _userFuture,
                 builder: (context, snap) {
                   final data =
                       snap.data?.data() ?? const <String, dynamic>{};
                   final name =
                       (data[AppFields.userFullName] as String?)?.trim() ??
-                          application.driverId;
+                          widget.application.driverId;
                   final init = _initials(name);
                   final verified =
                       (data[AppFields.userVerificationStatus] as String?) ==
@@ -1435,13 +1607,13 @@ class _ApplicantCard extends StatelessWidget {
                 },
               ),
               const Spacer(),
-              _StatusPill(status: application.status),
+              _StatusPill(status: widget.application.status),
             ],
           ),
-          if (application.notes.isNotEmpty) ...[
+          if (widget.application.notes.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
-              '"${application.notes}"',
+              '"${widget.application.notes}"',
               style: const TextStyle(
                 fontSize: 13,
                 color: _kTextSecondary,
@@ -1466,8 +1638,18 @@ class _ApplicantCard extends StatelessWidget {
                     onPressed: provider.isLoading
                         ? null
                         : () async {
-                            await provider.rejectApplication(
-                                jobId, application.id);
+                            try {
+                              await provider.rejectApplication(
+                                  widget.jobId, widget.application.id);
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: Colors.redAccent,
+                                  content: Text(e.toString()),
+                                ),
+                              );
+                            }
                           },
                     child: const Text('Reject'),
                   ),
@@ -1484,8 +1666,18 @@ class _ApplicantCard extends StatelessWidget {
                     onPressed: provider.isLoading
                         ? null
                         : () async {
-                            await provider.approveApplication(
-                                jobId, application.id);
+                            try {
+                              await provider.approveApplication(
+                                  widget.jobId, widget.application.id);
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: Colors.redAccent,
+                                  content: Text(e.toString()),
+                                ),
+                              );
+                            }
                           },
                     child: const Text('Accept'),
                   ),

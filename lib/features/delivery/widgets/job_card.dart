@@ -56,7 +56,17 @@ class JobCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.inventory_2_outlined, color: _purple, size: 24),
+                    (job.items.isNotEmpty && job.items.first['photo_url'] != null)
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              job.items.first['photo_url'] as String,
+                              width: 32,
+                              height: 32,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Icon(Icons.inventory_2_outlined, color: _purple, size: 24),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(

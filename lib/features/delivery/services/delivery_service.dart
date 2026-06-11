@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:unipool/core/constants.dart';
 import 'package:unipool/features/carpool/services/notification_service.dart';
 import '../models/delivery_application_model.dart';
@@ -135,6 +136,15 @@ class DeliveryService {
           .limit(1)
           .get();
       if (existing.docs.isNotEmpty) {
+        final existingDoc = existing.docs.first;
+        if (existingDoc.data()[AppFields.status] == DeliveryApplicationStatuses.rejected) {
+          // Re-apply by updating the existing application to pending
+          await existingDoc.reference.update({
+            AppFields.status: DeliveryApplicationStatuses.pending,
+            AppFields.createdAt: Timestamp.now(),
+          });
+          return;
+        }
         throw Exception('You have already applied to this job.');
       }
 
@@ -160,9 +170,9 @@ class DeliveryService {
         }
       }
 
-      final appRef = _applications(jobId).doc();
+      final appRef = _applications(jobId).doc(driverId);
       final application = DeliveryApplicationModel(
-        id: appRef.id,
+        id: driverId,
         jobId: jobId,
         driverId: driverId,
         status: DeliveryApplicationStatuses.pending,
@@ -170,6 +180,7 @@ class DeliveryService {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
+
       await appRef.set(application.toMap());
 
       // Notify the seller
@@ -343,11 +354,12 @@ class DeliveryService {
     try {
       final snapshot = await _jobs
           .where(AppFields.assignedDriverId, isEqualTo: driverId)
-          .orderBy(AppFields.createdAt, descending: true)
           .get();
-      return snapshot.docs
+      final jobs = snapshot.docs
           .map((doc) => DeliveryJobModel.fromMap(doc.data(), doc.id))
           .toList();
+      jobs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return jobs;
     } catch (error) {
       throw Exception('Failed to load driver jobs: $error');
     }
@@ -356,33 +368,32 @@ class DeliveryService {
   /// Loads jobs where the driver's application was rejected
   Future<List<DeliveryJobModel>> getRejectedDriverJobs(String driverId) async {
     try {
-      final appsSnapshot = await _firestore
-          .collectionGroup('applications')
-          .where(AppFields.driverId, isEqualTo: driverId)
+      // Get all active jobs
+      final snapshot = await _jobs
+          .where(AppFields.jobStatus, whereIn: [
+            DeliveryJobStatuses.open,
+            DeliveryJobStatuses.applicationsOpen,
+          ])
           .get();
 
-      if (appsSnapshot.docs.isEmpty) return [];
-
-      final rejectedJobIds = appsSnapshot.docs
-          .where((doc) =>
-              doc.data()[AppFields.status] ==
-              DeliveryApplicationStatuses.rejected)
-          .map((doc) => doc.data()[AppFields.jobId] as String? ?? '')
-          .where((id) => id.isNotEmpty)
-          .toSet()
-          .toList();
-
       final jobs = <DeliveryJobModel>[];
-      for (final id in rejectedJobIds) {
-        final doc = await _jobs.doc(id).get();
-        if (doc.exists) {
-          final job = DeliveryJobModel.fromMap(doc.data()!, doc.id);
+      for (final doc in snapshot.docs) {
+        // Query the applications subcollection
+        final apps = await _applications(doc.id)
+            .where(AppFields.driverId, isEqualTo: driverId)
+            .limit(1)
+            .get();
+            
+        if (apps.docs.isNotEmpty && 
+            apps.docs.first.data()[AppFields.status] == DeliveryApplicationStatuses.rejected) {
+          final job = DeliveryJobModel.fromMap(doc.data(), doc.id);
           jobs.add(job.copyWith(jobStatus: DeliveryApplicationStatuses.rejected));
         }
       }
       return jobs;
     } catch (error) {
-      throw Exception('Failed to load rejected jobs: $error');
+      debugPrint('Failed to load rejected jobs: $error');
+      return [];
     }
   }
 
@@ -391,13 +402,14 @@ class DeliveryService {
     try {
       return _jobs
           .where(AppFields.assignedDriverId, isEqualTo: driverId)
-          .orderBy(AppFields.createdAt, descending: true)
           .snapshots()
-          .map(
-            (snapshot) => snapshot.docs
+          .map((snapshot) {
+            final jobs = snapshot.docs
                 .map((doc) => DeliveryJobModel.fromMap(doc.data(), doc.id))
-                .toList(),
-          );
+                .toList();
+            jobs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return jobs;
+          });
     } catch (error) {
       throw Exception('Failed to stream driver jobs: $error');
     }
