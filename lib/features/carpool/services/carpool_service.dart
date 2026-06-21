@@ -30,7 +30,7 @@ class CarpoolService {
       _firestore.collection(AppCollections.carpoolGroups);
 
   /// Creates a new carpool request and seeds its group document.
-  Future<String> createRequest(CarpoolRequestModel request) async {
+  Future<String> createRequest(CarpoolRequestModel request, {bool isCreatorDriver = false}) async {
     try {
       // Prevent creating a new request if the user already has an active carpool
       final active = await getActiveCarpoolsForUser(request.creatorId);
@@ -53,7 +53,7 @@ class CarpoolService {
         transaction.set(
           groupRef,
           CarpoolGroupModel(
-            driverId: '',
+            driverId: isCreatorDriver ? request.creatorId : '',
             id: groupRef.id,
             requestId: requestRef.id,
             adminId: request.creatorId,
@@ -166,10 +166,13 @@ class CarpoolService {
       if (!requestDoc.exists) {
         throw Exception('Request not found.');
       }
-      if ((requestDoc.data()?[AppFields.creatorId] as String?) != currentUid) {
-        throw Exception('Only the creator can update the request status.');
-      }
+      final isCreator = (requestDoc.data()?[AppFields.creatorId] as String?) == currentUid;
+      final groupDoc = await _groups.doc(requestId).get();
+      final isDriver = groupDoc.exists && (groupDoc.data()?[AppFields.driverId] as String?) == currentUid;
 
+      if (!isCreator && !isDriver) {
+        throw Exception('Only the creator or assigned driver can update the request status.');
+      }
       await _requests.doc(requestId).update({AppFields.status: status});
     } catch (error) {
       throw Exception('Failed to update request: $error');
@@ -191,6 +194,43 @@ class CarpoolService {
       await _requests.doc(requestId).update(updates);
     } catch (error) {
       throw Exception('Failed to update request settings: $error');
+    }
+  }
+
+  /// Transfers creator ownership of a request to a new member.
+  Future<void> transferCreator(String requestId, String newCreatorId) async {
+    try {
+      final currentUid = _auth.currentUser!.uid;
+      final requestDoc = await _requests.doc(requestId).get();
+      if (!requestDoc.exists) {
+        throw Exception('Request not found.');
+      }
+      if ((requestDoc.data()?[AppFields.creatorId] as String?) != currentUid) {
+        throw Exception('Only the creator can transfer ownership.');
+      }
+
+      await _firestore.runTransaction((transaction) async {
+        final groupRef = _groups.doc(requestId);
+        final groupDoc = await transaction.get(groupRef);
+        if (!groupDoc.exists) {
+          throw Exception('Group not found.');
+        }
+
+        final groupData = groupDoc.data()!;
+        final memberIds = List<String>.from(groupData[AppFields.memberIds] ?? []);
+        if (!memberIds.contains(newCreatorId)) {
+          throw Exception('New creator must be a current member of the group.');
+        }
+
+        transaction.update(_requests.doc(requestId), {
+          AppFields.creatorId: newCreatorId,
+        });
+        transaction.update(groupRef, {
+          AppFields.adminId: newCreatorId,
+        });
+      });
+    } catch (error) {
+      throw Exception('Failed to transfer creator: $error');
     }
   }
 

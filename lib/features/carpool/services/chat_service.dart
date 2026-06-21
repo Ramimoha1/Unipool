@@ -19,7 +19,7 @@ class ChatService {
   Stream<List<ChatMessageModel>> getMessages(String groupId) {
     try {
       return _messages(groupId)
-          .orderBy(AppFields.sentAt)
+          .orderBy(AppFields.sentAt, descending: true)
           .snapshots()
           .map(
             (snapshot) => snapshot.docs
@@ -34,9 +34,11 @@ class ChatService {
   /// Sends a new message to the group chat.
   Future<void> sendMessage(String groupId, ChatMessageModel message) async {
     try {
+      final data = message.toMap();
+      data[AppFields.sentAt] = FieldValue.serverTimestamp();
       await _messages(groupId)
           .doc(message.id.isEmpty ? _messages(groupId).doc().id : message.id)
-          .set(message.toMap());
+          .set(data);
     } catch (error) {
       throw Exception('Failed to send message: $error');
     }

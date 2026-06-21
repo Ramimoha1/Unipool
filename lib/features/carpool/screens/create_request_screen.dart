@@ -11,6 +11,8 @@ import 'package:provider/provider.dart';
 import 'package:unipool/core/constants.dart';
 import '../models/carpool_request_model.dart';
 import '../providers/carpool_provider.dart';
+import '../providers/payment_provider.dart';
+import '../../profile/data/bank_details_repository.dart';
 import 'pick_location_screen.dart';
 import 'request_detail_screen.dart';
 
@@ -27,6 +29,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   final _destinationLabelController = TextEditingController();
   final _seatsController = TextEditingController(text: '3');
   final _totalAmountController = TextEditingController();
+  final _bankNameController = TextEditingController();
+  final _accountNumberController = TextEditingController();
+  final _accountNameController = TextEditingController();
   DateTime? _scheduledAt;
   double? _originLat;
   double? _originLng;
@@ -35,6 +40,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   String _rideType = CarpoolRideTypes.studentDriver;
   String _joinMode = CarpoolJoinModes.approval;
   bool _allowUnverifiedDriver = false;
+  bool _isCreatorDriver = false;
   String? _qrCodeUrl;
   bool _saving = false;
 
@@ -44,7 +50,37 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     _destinationLabelController.dispose();
     _seatsController.dispose();
     _totalAmountController.dispose();
+    _bankNameController.dispose();
+    _accountNumberController.dispose();
+    _accountNameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPaymentProfile() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final details = await BankDetailsRepository().getBankDetails(uid);
+      if (details != null && details.isNotEmpty) {
+        setState(() {
+          _bankNameController.text = details.bankName;
+          _accountNumberController.text = details.accountNumber;
+          _accountNameController.text = details.accountHolderName;
+          _qrCodeUrl = details.qrCodeUrl;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment profile loaded')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No payment profile found. Configure it in settings.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load profile: $e')),
+      );
+    }
   }
 
   Future<void> _pickLocation({required bool isOrigin}) async {
@@ -169,14 +205,27 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     try {
       final createdId = await context.read<CarpoolProvider>().createRequest(
         request,
+        isCreatorDriver: _rideType == CarpoolRideTypes.studentDriver && _isCreatorDriver,
       );
-      if (mounted && createdId != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RequestDetailScreen(requestId: createdId),
-          ),
-        );
+      if (createdId != null) {
+        if (_rideType == CarpoolRideTypes.grab || (_rideType == CarpoolRideTypes.studentDriver && _isCreatorDriver)) {
+          await context.read<PaymentProvider>().initializePayment(
+            createdId,
+            request.creatorId,
+            _qrCodeUrl ?? '',
+            _bankNameController.text.trim(),
+            _accountNumberController.text.trim(),
+            _accountNameController.text.trim(),
+          );
+        }
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RequestDetailScreen(requestId: createdId),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -244,6 +293,16 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
               onSelectionChanged: (value) =>
                   setState(() => _rideType = value.first),
             ),
+            if (_rideType == CarpoolRideTypes.studentDriver) ...[
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                title: const Text('I will be the driver for this ride'),
+                value: _isCreatorDriver,
+                onChanged: (val) => setState(() => _isCreatorDriver = val ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ],
             const SizedBox(height: 12),
             SwitchListTile(
               value: _allowUnverifiedDriver,
@@ -280,17 +339,56 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                 labelText: 'Total fare (optional)',
               ),
             ),
-            const SizedBox(height: 16),
-            Text('QR Code', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            if (_qrCodeUrl != null)
-              Image.network(_qrCodeUrl!, height: 120)
-            else
-              OutlinedButton.icon(
-                onPressed: _uploadQrCode,
-                icon: const Icon(Icons.upload),
-                label: const Text('Upload QR'),
+            if (_rideType == CarpoolRideTypes.grab || (_rideType == CarpoolRideTypes.studentDriver && _isCreatorDriver)) ...[
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Payment Settings', style: Theme.of(context).textTheme.titleMedium),
+                  TextButton.icon(
+                    onPressed: _loadPaymentProfile,
+                    icon: const Icon(Icons.person),
+                    label: const Text('Use my profile'),
+                  ),
+                ],
               ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _bankNameController,
+                decoration: const InputDecoration(labelText: 'Bank Name'),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _accountNumberController,
+                decoration: const InputDecoration(labelText: 'Account Number'),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _accountNameController,
+                decoration: const InputDecoration(labelText: 'Account Holder Name'),
+              ),
+              const SizedBox(height: 16),
+              Text('QR Code', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              if (_qrCodeUrl != null && _qrCodeUrl!.isNotEmpty)
+                Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    Image.network(_qrCodeUrl!, height: 120),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.red),
+                      onPressed: () => setState(() => _qrCodeUrl = null),
+                    ),
+                  ],
+                )
+              else
+                OutlinedButton.icon(
+                  onPressed: _uploadQrCode,
+                  icon: const Icon(Icons.upload),
+                  label: const Text('Upload QR'),
+                ),
+            ],
             const SizedBox(height: 20),
             if (provider.hasActiveCarpool)
               Padding(

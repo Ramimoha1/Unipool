@@ -155,6 +155,7 @@ class CarpoolApplicantStatuses {
 
 class CarpoolPaymentStatuses {
   static const pending = 'pending';
+  static const awaitingPayment = 'awaiting_payment';
   static const settled = 'settled';
 }
 

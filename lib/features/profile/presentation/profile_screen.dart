@@ -6,6 +6,7 @@ import '../data/driver_verification_repository.dart';
 import 'apply_driver_screen.dart';
 import 'package:unipool/features/profile/presentation/account_settings_screen.dart';
 import 'package:unipool/features/profile/presentation/payment_settings_screen.dart';
+import 'package:unipool/features/profile/presentation/payment_history_screen.dart';
 import 'package:unipool/features/auth/presentation/auth_gate.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -622,6 +623,15 @@ class _QuickActionsCard extends StatelessWidget {
               icon: Icons.inventory_2_outlined,
               iconColor: const Color(0xFF7C3AED),
               label: 'My Delivery Jobs'),
+          _ActionRow(
+              icon: Icons.history,
+              iconColor: Colors.orange,
+              label: 'Payment History',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const PaymentHistoryScreen()),
+              )),
           _ActionRow(
               icon: Icons.credit_card_outlined,
               iconColor: const Color(0xFF2563EB),
