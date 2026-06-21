@@ -23,6 +23,7 @@ class DeliveryJobModel {
     required this.sellerApprovedDriverId,
     required this.createdAt,
     required this.updatedAt,
+    this.preDisputeStatus = '',
   });
 
   final String id;
@@ -45,6 +46,13 @@ class DeliveryJobModel {
   final String sellerApprovedDriverId;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  // The job's status immediately before a dispute was filed, e.g.
+  // 'in_progress' or 'awaiting_payment'. Set when jobStatus flips to
+  // 'disputed', read back when the dispute is resolved so the job can
+  // return to where it actually was instead of an admin guessing.
+  // Empty string when there is no open dispute.
+  final String preDisputeStatus;
 
   factory DeliveryJobModel.fromMap(Map<String, dynamic> map, String id) {
     return DeliveryJobModel(
@@ -80,6 +88,7 @@ class DeliveryJobModel {
           (map[AppFields.createdAt] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt:
           (map[AppFields.updatedAt] as Timestamp?)?.toDate() ?? DateTime.now(),
+      preDisputeStatus: map[AppFields.preDisputeStatus] as String? ?? '',
     );
   }
 
@@ -104,6 +113,7 @@ class DeliveryJobModel {
       AppFields.sellerApprovedDriverId: sellerApprovedDriverId,
       AppFields.createdAt: Timestamp.fromDate(createdAt),
       AppFields.updatedAt: Timestamp.fromDate(updatedAt),
+      AppFields.preDisputeStatus: preDisputeStatus,
     };
   }
 
@@ -128,6 +138,7 @@ class DeliveryJobModel {
     String? sellerApprovedDriverId,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? preDisputeStatus,
   }) {
     return DeliveryJobModel(
       id: id ?? this.id,
@@ -151,6 +162,7 @@ class DeliveryJobModel {
           sellerApprovedDriverId ?? this.sellerApprovedDriverId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      preDisputeStatus: preDisputeStatus ?? this.preDisputeStatus,
     );
   }
 }

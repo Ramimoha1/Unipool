@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:unipool/core/constants.dart';
 import '../models/ride_payment_model.dart';
@@ -9,13 +10,16 @@ class PaymentService {
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
     NotificationService? notificationService,
+    FirebaseFunctions? functions,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
-       _notificationService = notificationService ?? NotificationService();
+       _notificationService = notificationService ?? NotificationService(),
+       _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final NotificationService _notificationService;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> get _requests =>
       _firestore.collection(AppCollections.carpoolRequests);
@@ -24,80 +28,75 @@ class PaymentService {
   CollectionReference<Map<String, dynamic>> get _groups =>
       _firestore.collection(AppCollections.carpoolGroups);
 
-  /// Initializes a payment document for a newly created carpool request.
-  Future<void> initializePayment(
-    String requestId,
-    String bookedByUserId,
-    String qrCodeUrl,
-    String bankName,
-    String accountNumber,
-    String accountName,
-  ) async {
+  /// Creates a payment document for a completed carpool group.
+  Future<void> triggerPayment(String requestId) async {
     try {
+      final requestDoc = await _requests.doc(requestId).get();
+      if (!requestDoc.exists) {
+        throw Exception('Request not found.');
+      }
+
+      final requestData = requestDoc.data()!;
+      if (requestData[AppFields.status] != CarpoolRequestStatuses.inProgress) {
+        throw Exception(
+          'Payment can only be triggered when the request is in progress.',
+        );
+      }
+
+      final currentUid = _auth.currentUser!.uid;
+      if (requestData[AppFields.creatorId] != currentUid) {
+        throw Exception('Only the request creator can trigger payment.');
+      }
+
+      final groupQuery = await _groups
+          .where(AppFields.requestId, isEqualTo: requestId)
+          .limit(1)
+          .get();
+      if (groupQuery.docs.isEmpty) {
+        throw Exception('Carpool group not found.');
+      }
+
+      final group = groupQuery.docs.first.data();
+      final members = (group[AppFields.memberIds] as List<dynamic>? ?? const [])
+          .map((value) => value.toString())
+          .toList();
+      final bookedByUserId =
+          (group[AppFields.driverId] as String?)?.isNotEmpty == true
+          ? group[AppFields.driverId] as String
+          : requestData[AppFields.creatorId] as String;
+
       final paymentRef = _payments.doc();
       final payment = RidePaymentModel(
         id: paymentRef.id,
         requestId: requestId,
         bookedByUserId: bookedByUserId,
-        qrCodeUrl: qrCodeUrl,
-        bankName: bankName,
-        accountNumber: accountNumber,
-        accountName: accountName,
+        qrCodeUrl: '', // filled in below by copyPayeeBankDetails
         totalAmount: 0,
-        passengerDues: {},
+        splitAmount: 0,
         status: CarpoolPaymentStatuses.pending,
         confirmedBy: const [],
         createdAt: DateTime.now(),
       );
       await paymentRef.set(payment.toMap());
-    } catch (error) {
-      throw Exception('Failed to initialize payment: $error');
-    }
-  }
 
-  /// Updates the payment settings for a request.
-  Future<void> updatePaymentSettings(
-    String paymentId,
-    String qrCodeUrl,
-    String bankName,
-    String accountNumber,
-    String accountName,
-  ) async {
-    try {
-      await _payments.doc(paymentId).update({
-        AppFields.qrCodeUrl: qrCodeUrl,
-        'bankName': bankName,
-        'accountNumber': accountNumber,
-        'accountName': accountName,
-      });
-    } catch (error) {
-      throw Exception('Failed to update payment settings: $error');
-    }
-  }
+      // Bank details / QR are owner-locked in their own collection now
+      // (see bank_details_repository.dart). The client never reads
+      // another user's bank details directly — this Cloud Function
+      // does it server-side and copies a snapshot onto the payment doc.
+      await _functions
+          .httpsCallable(FirebaseFunctionNames.copyPayeeBankDetails)
+          .call(<String, dynamic>{
+            'payeeId': bookedByUserId,
+            'paymentCollection': AppCollections.ridePayments,
+            'paymentId': paymentRef.id,
+          });
 
-  /// Triggers the payment to start (moves status to awaiting_payment and sets dues).
-  Future<void> triggerPayment(String paymentId, double totalAmount, Map<String, double> passengerDues) async {
-    try {
-      final doc = await _payments.doc(paymentId).get();
-      if (!doc.exists) {
-        throw Exception('Payment not found.');
-      }
-
-      await _payments.doc(paymentId).update({
-        AppFields.totalAmount: totalAmount,
-        'passengerDues': passengerDues,
-        AppFields.paymentStatus: CarpoolPaymentStatuses.awaitingPayment, // Ensure you use the correct constant
-      });
-
-      // Send notifications to payers
-      for (final memberId in passengerDues.keys) {
-        if (passengerDues[memberId]! > 0) {
-          await _notificationService.sendFCMToUser(
-            memberId,
-            'Payment ready',
-            'A carpool payment is ready for your group.',
-          );
-        }
+      for (final memberId in members) {
+        await _notificationService.sendFCMToUser(
+          memberId,
+          'Payment ready',
+          'A carpool payment is ready for your group.',
+        );
       }
     } catch (error) {
       throw Exception('Failed to trigger payment: $error');

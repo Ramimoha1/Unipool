@@ -73,3 +73,53 @@ export const sendFCMNotification = onCall(async (request) => {
   await sendPushToUser(userId, title, body);
   return { success: true };
 });
+
+// Copies a payee's bank/QR details onto a payment document, server-side.
+// This is the ONLY place that reads another user's bank_details doc — it
+// runs with admin privileges and bypasses Firestore rules by design. The
+// client never reads bank_details/{otherUid} directly; it calls this
+// function instead, right after creating a payment document.
+const ALLOWED_PAYMENT_COLLECTIONS = ['ride_payments', 'delivery_payments'];
+
+export const copyPayeeBankDetails = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Authentication required.');
+  }
+
+  const payeeId = request.data?.payeeId as string | undefined;
+  const paymentCollection = request.data?.paymentCollection as string | undefined;
+  const paymentId = request.data?.paymentId as string | undefined;
+
+  if (!payeeId || !paymentCollection || !paymentId) {
+    throw new HttpsError(
+      'invalid-argument',
+      'payeeId, paymentCollection, and paymentId are required.',
+    );
+  }
+
+  if (!ALLOWED_PAYMENT_COLLECTIONS.includes(paymentCollection)) {
+    throw new HttpsError('invalid-argument', 'Unknown payment collection.');
+  }
+
+  const paymentRef = db.collection(paymentCollection).doc(paymentId);
+  const paymentSnap = await paymentRef.get();
+  if (!paymentSnap.exists) {
+    throw new HttpsError('not-found', 'Payment document not found.');
+  }
+
+  const bankDoc = await db.collection('bank_details').doc(payeeId).get();
+  const bankData = bankDoc.exists ? bankDoc.data() : null;
+
+  await paymentRef.update({
+    payee_bank_snapshot: bankData
+      ? {
+          bankName: bankData.bankName ?? '',
+          accountHolderName: bankData.accountHolderName ?? '',
+          accountNumber: bankData.accountNumber ?? '',
+          qrCodeUrl: bankData.qrCodeUrl ?? '',
+        }
+      : null,
+  });
+
+  return { success: true, hasBankDetails: bankData !== null };
+});

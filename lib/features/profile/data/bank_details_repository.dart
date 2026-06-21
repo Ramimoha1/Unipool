@@ -4,9 +4,19 @@ import 'package:image_picker/image_picker.dart';
 import 'package:unipool/core/constants.dart';
 import '../domain/bank_details_model.dart';
 
-/// Repository for reading / writing bank payment details on the user document.
+/// Repository for reading / writing bank payment details.
 ///
-/// Bank details are stored as a nested map at `users/{uid}.bankDetails`.
+/// IMPORTANT: bank details now live in their own top-level collection
+/// `bank_details/{uid}` — NOT nested on `users/{uid}` anymore. The old
+/// location was readable by every signed-in user (see firestore.rules
+/// before this change), which exposed account numbers to anyone in the
+/// app. The new collection is locked to owner-only read/write.
+///
+/// Other users never read this collection directly. When a payment is
+/// triggered (carpool or delivery), a Cloud Function copies a snapshot
+/// of the payee's bank details onto the payment document, which already
+/// has correct member-scoped access rules. See `copyPayeeBankDetails`
+/// in functions/src/index.ts.
 class BankDetailsRepository {
   BankDetailsRepository({
     FirebaseFirestore? firestore,
@@ -17,45 +27,34 @@ class BankDetailsRepository {
   final FirebaseFirestore _firestore;
   final FirebaseStorage _storage;
 
-  DocumentReference<Map<String, dynamic>> _userDoc(String userId) =>
-      _firestore.collection(AppCollections.users).doc(userId);
+  DocumentReference<Map<String, dynamic>> _doc(String userId) =>
+      _firestore.collection(AppCollections.bankDetails).doc(userId);
 
   // ── Read ─────────────────────────────────────────────────────────────────
 
-  /// One-shot fetch of the current bank details.
+  /// One-shot fetch of the current bank details. Only callable for your
+  /// own uid under the new rules — calling this with someone else's uid
+  /// will throw a permission-denied error, which is intentional.
   Future<BankDetailsModel> getBankDetails(String userId) async {
-    final snap = await _userDoc(userId).get();
-    final data = snap.data();
-    if (data == null) return const BankDetailsModel();
-    return BankDetailsModel.fromMap(
-      data[AppFields.bankDetails] as Map<String, dynamic>?,
-    );
+    final snap = await _doc(userId).get();
+    return BankDetailsModel.fromMap(snap.data());
   }
 
   /// Real-time stream of bank details changes.
   Stream<BankDetailsModel> bankDetailsStream(String userId) {
-    return _userDoc(userId).snapshots().map((snap) {
-      final data = snap.data();
-      if (data == null) return const BankDetailsModel();
-      return BankDetailsModel.fromMap(
-        data[AppFields.bankDetails] as Map<String, dynamic>?,
-      );
-    });
+    return _doc(userId).snapshots().map(
+          (snap) => BankDetailsModel.fromMap(snap.data()),
+        );
   }
 
   // ── Write ────────────────────────────────────────────────────────────────
 
-  /// Saves (or updates) the bank details nested map on the user document.
-  ///
-  /// Also keeps the legacy top-level `qr_code_url` field in sync so that
-  /// existing carpool payment logic continues to work without modification.
+  /// Saves (or creates) the bank details document for this user.
   Future<void> saveBankDetails(String userId, BankDetailsModel details) async {
-    await _userDoc(userId).update({
-      AppFields.bankDetails: details.toMap(),
-      // Keep the legacy field in sync for backward compatibility
-      AppFields.userQrCodeUrlSnake: details.qrCodeUrl,
+    await _doc(userId).set({
+      ...details.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
   }
 
   /// Uploads a QR code image to Firebase Storage and returns the download URL.
@@ -67,20 +66,14 @@ class BankDetailsRepository {
     final mimeType = file.mimeType ?? 'image/jpeg';
     final ext = file.name.split('.').last.toLowerCase();
 
-    final ref = _storage
-        .ref()
-        .child('user_qr_codes/$userId/qr.$ext');
+    final ref = _storage.ref().child('user_qr_codes/$userId/qr.$ext');
 
     await ref.putData(bytes, SettableMetadata(contentType: mimeType));
     return ref.getDownloadURL();
   }
 
-  /// Removes all bank details from the user document.
+  /// Removes all bank details for this user.
   Future<void> deleteBankDetails(String userId) async {
-    await _userDoc(userId).update({
-      AppFields.bankDetails: FieldValue.delete(),
-      AppFields.userQrCodeUrlSnake: FieldValue.delete(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    await _doc(userId).delete();
   }
 }

@@ -9,6 +9,11 @@ class AppCollections {
   // Delivery
   static const deliveryJobs = 'delivery_jobs';
   static const deliveryDisputes = 'delivery_disputes';
+  static const deliveryPayments = 'delivery_payments';
+
+  // Bank/QR payment details — owner-locked, separate from users/{uid}.
+  // See bank_details_repository.dart and firestore.rules.
+  static const bankDetails = 'bank_details';
 }
 
 class AppFields {
@@ -76,8 +81,10 @@ class AppFields {
   static const qrCodeUrl = 'qr_code_url';
   static const totalAmount = 'total_amount';
   static const splitAmount = 'split_amount';
+  static const passengerDues = 'passenger_dues';
   static const paymentStatus = 'status';
   static const confirmedBy = 'confirmed_by';
+  static const payeeBankSnapshot = 'payee_bank_snapshot';
 
   // Bank details fields (nested map on user doc)
   static const bankDetails = 'bankDetails';
@@ -108,6 +115,9 @@ class AppFields {
   static const price = 'price';
   static const allowedDrivers = 'allowed_drivers';
   static const jobStatus = 'job_status';
+  static const preDisputeStatus = 'pre_dispute_status';
+  static const disputeReason = 'reason';
+  static const filedBy = 'filed_by';
   static const assignedDriverId = 'assigned_driver_id';
   static const sellerApprovedDriverId = 'seller_approved_driver_id';
 
@@ -178,6 +188,7 @@ class CarpoolReportStatuses {
 
 class FirebaseFunctionNames {
   static const sendFcmNotification = 'sendFCMNotification';
+  static const copyPayeeBankDetails = 'copyPayeeBankDetails';
 }
 
 class CarpoolJoinModes {
@@ -216,6 +227,40 @@ class DeliveryDisputeStatuses {
   static const open = 'open';
   static const underReview = 'under_review';
   static const resolved = 'resolved';
+}
+
+// Reasons a SELLER can report a DRIVER for.
+class DeliveryDisputeSellerReasons {
+  static const noShow = 'driver_no_show';
+  static const lateDelivery = 'late_delivery';
+  static const itemDamaged = 'item_damaged_or_lost';
+  static const unprofessional = 'unprofessional_conduct';
+  static const other = 'other';
+
+  static const Map<String, String> labels = {
+    noShow: 'Driver did not show up',
+    lateDelivery: 'Delivery was very late',
+    itemDamaged: 'Item was damaged or lost',
+    unprofessional: 'Unprofessional conduct',
+    other: 'Other',
+  };
+}
+
+// Reasons a DRIVER can report a SELLER for.
+class DeliveryDisputeDriverReasons {
+  static const paymentNotSent = 'payment_not_sent';
+  static const unfairProofRejection = 'unfair_proof_rejection';
+  static const wrongPickupInfo = 'wrong_pickup_info';
+  static const unprofessional = 'unprofessional_conduct';
+  static const other = 'other';
+
+  static const Map<String, String> labels = {
+    paymentNotSent: 'Seller has not paid',
+    unfairProofRejection: 'Proof of delivery unfairly rejected',
+    wrongPickupInfo: 'Pickup info was wrong/misleading',
+    unprofessional: 'Unprofessional conduct',
+    other: 'Other',
+  };
 }
 
 class DeliveryAllowedDrivers {
