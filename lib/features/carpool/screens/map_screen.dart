@@ -268,30 +268,36 @@ class _MapScreenState extends State<MapScreen> {
                               ),
                             ),
                           const SizedBox(height: 8),
-                          if (!showOnlyMyCarpool &&
-                              provider.myRequests.isNotEmpty) ...[
-                            const Text(
-                              'My Requests',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...provider.myRequests.map(
-                              (request) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: RequestCard(
-                                  request: request,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => RequestDetailScreen(
-                                        requestId: request.id,
+                          if (!showOnlyMyCarpool && provider.myRequests.isNotEmpty) ...[
+                            Theme(
+                              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                              child: ExpansionTile(
+                                tilePadding: EdgeInsets.zero,
+                                initiallyExpanded: false,
+                                title: const Text(
+                                  'My Requests',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                children: provider.myRequests.map(
+                                  (request) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: RequestCard(
+                                      request: request,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => RequestDetailScreen(
+                                            requestId: request.id,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
+                                ).toList(),
                               ),
                             ),
                             const SizedBox(height: 8),
