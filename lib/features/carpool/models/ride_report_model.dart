@@ -11,6 +11,8 @@ class RideReportModel {
     required this.description,
     required this.status,
     required this.createdAt,
+    this.attachmentUrls = const [],
+    this.chatSnapshot = const [],
   });
 
   final String id;
@@ -21,6 +23,8 @@ class RideReportModel {
   final String description;
   final String status;
   final DateTime createdAt;
+  final List<String> attachmentUrls;
+  final List<Map<String, dynamic>> chatSnapshot;
 
   factory RideReportModel.fromMap(Map<String, dynamic> map, String id) {
     return RideReportModel(
@@ -32,6 +36,11 @@ class RideReportModel {
       description: map[AppFields.description] as String? ?? '',
       status: map[AppFields.status] as String? ?? CarpoolReportStatuses.open,
       createdAt: (map[AppFields.createdAt] as Timestamp?)?.toDate() ?? DateTime.now(),
+      attachmentUrls: (map[AppFields.attachmentUrls] as List<dynamic>?)?.cast<String>() ?? [],
+      chatSnapshot: (map[AppFields.chatSnapshot] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [],
     );
   }
 
@@ -44,6 +53,8 @@ class RideReportModel {
       AppFields.description: description,
       AppFields.status: status,
       AppFields.createdAt: Timestamp.fromDate(createdAt),
+      AppFields.attachmentUrls: attachmentUrls,
+      AppFields.chatSnapshot: chatSnapshot,
     };
   }
 
@@ -56,6 +67,8 @@ class RideReportModel {
     String? description,
     String? status,
     DateTime? createdAt,
+    List<String>? attachmentUrls,
+    List<Map<String, dynamic>>? chatSnapshot,
   }) {
     return RideReportModel(
       id: id ?? this.id,
@@ -66,6 +79,8 @@ class RideReportModel {
       description: description ?? this.description,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      attachmentUrls: attachmentUrls ?? this.attachmentUrls,
+      chatSnapshot: chatSnapshot ?? this.chatSnapshot,
     );
   }
 }

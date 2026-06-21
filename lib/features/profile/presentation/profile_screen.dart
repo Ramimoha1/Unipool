@@ -6,6 +6,7 @@ import '../data/driver_verification_repository.dart';
 import 'apply_driver_screen.dart';
 import 'package:unipool/features/profile/presentation/account_settings_screen.dart';
 import 'package:unipool/features/profile/presentation/payment_settings_screen.dart';
+import 'package:unipool/features/profile/presentation/payment_history_screen.dart';
 import 'package:unipool/features/auth/presentation/auth_gate.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -60,6 +61,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final rating = (userData['rating'] as num?)?.toDouble() ?? 0.0;
           // Admin rejection note (written by admin when rejecting driver app)
           final rejectionNote = userData['rejectionNote'] as String?;
+          
+          final bannedStatus = userData['bannedStatus'] as String? ?? 'none';
+          final bannedReason = userData['bannedReason'] as String? ?? 'No reason provided';
 
           return CustomScrollView(
             slivers: [
@@ -70,6 +74,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (bannedStatus != 'none')
+                        _BannedBanner(
+                          bannedStatus: bannedStatus,
+                          bannedReason: bannedReason,
+                        ),
                       _StatsRow(
                           rides: rides,
                           deliveries: deliveries,
@@ -182,6 +191,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Banned Banner ────────────────────────────────────────────────────────────
+
+class _BannedBanner extends StatelessWidget {
+  const _BannedBanner({required this.bannedStatus, required this.bannedReason});
+  final String bannedStatus;
+  final String bannedReason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEE2E2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEF4444)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.block, color: Color(0xFFDC2626)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Account Suspended', style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text('Status: $bannedStatus', style: const TextStyle(color: Color(0xFF991B1B), fontSize: 14)),
+                Text('Reason: $bannedReason', style: const TextStyle(color: Color(0xFF991B1B), fontSize: 14)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -622,6 +670,15 @@ class _QuickActionsCard extends StatelessWidget {
               icon: Icons.inventory_2_outlined,
               iconColor: const Color(0xFF7C3AED),
               label: 'My Delivery Jobs'),
+          _ActionRow(
+              icon: Icons.history,
+              iconColor: Colors.orange,
+              label: 'Payment History',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const PaymentHistoryScreen()),
+              )),
           _ActionRow(
               icon: Icons.credit_card_outlined,
               iconColor: const Color(0xFF2563EB),

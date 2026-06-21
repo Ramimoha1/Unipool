@@ -50,16 +50,41 @@ class _PaymentScreenState extends State<PaymentScreen> {
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  if (payment.bankName.isNotEmpty || payment.accountNumber.isNotEmpty)
+                    Card(
+                      color: const Color(0xFFF1F5F9),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Bank Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(height: 8),
+                            if (payment.bankName.isNotEmpty) Text('Bank: ${payment.bankName}'),
+                            if (payment.accountNumber.isNotEmpty) Text('Account: ${payment.accountNumber}'),
+                            if (payment.accountName.isNotEmpty) Text('Name: ${payment.accountName}'),
+                          ],
+                        ),
+                      ),
+                    ),
                   if (payment.qrCodeUrl.isNotEmpty)
                     Image.network(payment.qrCodeUrl, height: 220)
-                  else
-                    const Center(child: Text('QR code not available yet.')),
+                  else if (payment.bankName.isEmpty && payment.accountNumber.isEmpty)
+                    const Center(child: Text('Payment details not available yet.')),
                   const SizedBox(height: 16),
-                  Center(child: Text('Scan to pay ${payment.splitAmount.toStringAsFixed(2)}')),
+                  Center(child: Text('Amount Due: RM ${(payment.passengerDues[currentUid] ?? 0.0).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
                   const SizedBox(height: 24),
                   const PaymentBanner(message: 'Confirm payment once you have paid.'),
                   const SizedBox(height: 16),
-                  ...members.map((memberId) {
+                  ...members.where((memberId) {
+                    final isPayee = currentUid == payment.bookedByUserId;
+                    if (isPayee) {
+                      return memberId != currentUid && (payment.passengerDues[memberId] ?? 0.0) > 0;
+                    } else {
+                      return memberId == currentUid;
+                    }
+                  }).map((memberId) {
                     final confirmed = payment.confirmedBy.contains(memberId);
                     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                       future: FirebaseFirestore.instance.collection(AppCollections.users).doc(memberId).get(),
@@ -75,17 +100,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           child: ListTile(
                             leading: Icon(confirmed ? Icons.check_circle : Icons.schedule, color: confirmed ? Colors.green : Colors.grey),
                             title: Text(name),
-                            subtitle: Text('${confirmed ? 'Paid' : 'Pending'} • ${_verificationLabel(verificationStatus)}'),
+                            subtitle: Text('Due: RM ${(payment.passengerDues[memberId] ?? 0.0).toStringAsFixed(2)} • ${confirmed ? 'Paid' : 'Pending'} • ${_verificationLabel(verificationStatus)}'),
                           ),
                         );
                       },
                     );
                   }),
-                  if (!payment.confirmedBy.contains(currentUid))
+                  if ((payment.passengerDues[currentUid] ?? 0) > 0 && !payment.confirmedBy.contains(currentUid))
                     FilledButton(
                       onPressed: () => context.read<PaymentProvider>().confirmPayment(payment.id, currentUid),
                       child: const Text('I\'ve Paid'),
                     ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Pay Later'),
+                  ),
                 ],
               );
             },

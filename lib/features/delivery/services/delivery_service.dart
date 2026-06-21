@@ -25,11 +25,24 @@ class DeliveryService {
   CollectionReference<Map<String, dynamic>> _applications(String jobId) =>
       _jobs.doc(jobId).collection('applications');
 
+  Future<void> _checkBanStatus(String userId) async {
+    final doc = await _firestore.collection(AppCollections.users).doc(userId).get();
+    final data = doc.data();
+    if (data == null) return;
+
+    final status = data[AppFields.userBannedStatus] as String?;
+    if (status != null && status != 'none') {
+      final reason = data[AppFields.userBannedReason] as String? ?? 'No reason provided';
+      throw Exception('BANNED: You are currently banned ($status). Reason: $reason.');
+    }
+  }
+
   // ── Job CRUD ──────────────────────────────────────────────────────────
 
   /// Creates a new delivery job.
   Future<String> createJob(DeliveryJobModel job) async {
     try {
+      await _checkBanStatus(job.sellerId);
       final jobRef = job.id.isEmpty ? _jobs.doc() : _jobs.doc(job.id);
       final storedJob = job.copyWith(
         id: jobRef.id,
@@ -119,6 +132,7 @@ class DeliveryService {
     String notes = '',
   }) async {
     try {
+      await _checkBanStatus(driverId);
       final jobDoc = await _jobs.doc(jobId).get();
       if (!jobDoc.exists) {
         throw Exception('Delivery job not found.');

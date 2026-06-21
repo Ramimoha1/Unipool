@@ -138,12 +138,12 @@ class CarpoolProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> createRequest(CarpoolRequestModel request) async {
+  Future<String?> createRequest(CarpoolRequestModel request, {bool isCreatorDriver = false}) async {
     isLoading = true;
     error = null;
     notifyListeners();
     try {
-      final createdId = await _service.createRequest(request);
+      final createdId = await _service.createRequest(request, isCreatorDriver: isCreatorDriver);
       currentRequest = request.copyWith(id: createdId);
       return createdId;
     } catch (exception) {
@@ -165,6 +165,21 @@ class CarpoolProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _service.applyToRequest(requestId, userId, role);
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> withdrawApplication(String applicantId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.withdrawApplication(applicantId);
     } catch (exception) {
       error = exception.toString();
       rethrow;
@@ -214,6 +229,36 @@ class CarpoolProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _service.updateRequestStatus(requestId, status);
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateRequestSettings(String requestId, Map<String, dynamic> updates) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.updateRequestSettings(requestId, updates);
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> transferCreator(String requestId, String newCreatorId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.transferCreator(requestId, newCreatorId);
     } catch (exception) {
       error = exception.toString();
       rethrow;

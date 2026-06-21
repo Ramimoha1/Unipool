@@ -59,7 +59,12 @@ service cloud.firestore {
           || isGroupMember(requestId)
         );
       allow create: if isSignedIn() && request.resource.data.creator_id == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.creator_id == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.creator_id == request.auth.uid ||
+        resource.data.status == 'open' ||
+        isGroupMember(requestId)
+      );
+      allow delete: if isSignedIn() && resource.data.creator_id == request.auth.uid;
     }
 
     match /carpool_applicants/{applicantId} {
@@ -68,8 +73,14 @@ service cloud.firestore {
         requestDoc(resource.data.request_id).data.creator_id == request.auth.uid
       );
       allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
-      allow update: if isSignedIn() && requestDoc(resource.data.request_id).data.creator_id == request.auth.uid;
-      allow delete: if false;
+      allow update: if isSignedIn() && (
+        requestDoc(resource.data.request_id).data.creator_id == request.auth.uid ||
+        resource.data.user_id == request.auth.uid
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.user_id == request.auth.uid ||
+        requestDoc(resource.data.request_id).data.creator_id == request.auth.uid
+      );
     }
 
     match /carpool_groups/{requestId} {
@@ -79,7 +90,11 @@ service cloud.firestore {
         || requestDoc(requestId).data.creator_id == request.auth.uid
         || requestDoc(requestId).data.status == 'open'
       );
-      allow update: if isSignedIn() && resource.data.admin_id == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.admin_id == request.auth.uid ||
+        requestDoc(requestId).data.status == 'open' ||
+        resource.data.member_ids.hasAny([request.auth.uid])
+      );
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -89,19 +104,21 @@ service cloud.firestore {
     }
 
     match /ride_payments/{paymentId} {
-      allow read: if isSignedIn() && groupDoc(resource.data.request_id).data.member_ids.hasAny([request.auth.uid]);
-      allow create: if isSignedIn() && requestDoc(request.resource.data.request_id).data.creator_id == request.auth.uid;
-      allow update: if isSignedIn()
-        && groupDoc(resource.data.request_id).data.member_ids.hasAny([request.auth.uid])
-        && request.resource.data.request_id == resource.data.request_id
-        && request.resource.data.booked_by_user_id == resource.data.booked_by_user_id
-        && request.resource.data.qr_code_url == resource.data.qr_code_url
-        && request.resource.data.total_amount == resource.data.total_amount
-        && request.resource.data.split_amount == resource.data.split_amount
-        && request.resource.data.status == resource.data.status
-        && request.resource.data.created_at == resource.data.created_at
-        && request.resource.data.confirmed_by.hasAll(resource.data.confirmed_by)
-        && request.resource.data.confirmed_by.hasAny([request.auth.uid]);
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        requestDoc(request.resource.data.request_id).data.creator_id == request.auth.uid ||
+        groupDoc(request.resource.data.request_id).data.driver_id == request.auth.uid
+      );
+      allow update: if isSignedIn() && (
+        requestDoc(resource.data.request_id).data.creator_id == request.auth.uid ||
+        groupDoc(resource.data.request_id).data.driver_id == request.auth.uid ||
+        (
+          groupDoc(resource.data.request_id).data.member_ids.hasAny([request.auth.uid]) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['confirmed_by']) &&
+          request.resource.data.confirmed_by.hasAll(resource.data.confirmed_by) &&
+          request.resource.data.confirmed_by.hasAny([request.auth.uid])
+        )
+      );
       allow delete: if false;
     }
 

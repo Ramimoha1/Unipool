@@ -10,6 +10,15 @@ service firebase.storage {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    match /profile_photos/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+    }
+
+    match /ride_reports_attachments/{reportId}/{fileName} {
+      allow read, write: if isSignedIn();
+    }
+
     match /user_qr_codes/{userId}/{fileName} {
       allow read, write: if isOwner(userId);
     }

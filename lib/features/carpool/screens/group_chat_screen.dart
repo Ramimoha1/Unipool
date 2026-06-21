@@ -41,8 +41,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   final _chatService = ChatService();
   final _paymentService = PaymentService();
   final _carpoolService = CarpoolService();
-  bool _uploadingQr = false;
-  bool _endingRide = false;
 
   @override
   void initState() {
@@ -80,67 +78,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     _messageController.clear();
   }
 
-  Future<_RideQrInfo> _loadRideQrInfo(
-    CarpoolGroupModel? group,
-    String creatorId,
-  ) async {
-    final bookedByUserId =
-        (group?.driverId.isNotEmpty ?? false) ? group!.driverId : creatorId;
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection(AppCollections.users)
-        .doc(bookedByUserId)
-        .get();
-    final userData = userDoc.data();
-    final qrCodeUrl =
-        (userData?[AppFields.userQrCodeUrl] as String?) ??
-        (userData?[AppFields.userQrCodeUrlSnake] as String?) ??
-        '';
-    return _RideQrInfo(bookedByUserId: bookedByUserId, qrCodeUrl: qrCodeUrl);
-  }
-
-  Future<void> _uploadQrCode() async {
-    if (_uploadingQr) return;
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
-
-    setState(() => _uploadingQr = true);
-    try {
-      final uid = FirebaseAuth.instance.currentUser!.uid;
-      final storageRef = FirebaseStorage.instance.ref().child(
-        'user_qr_codes/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
-      if (kIsWeb) {
-        final bytes = await picked.readAsBytes();
-        await storageRef.putData(bytes);
-      } else {
-        await storageRef.putFile(io.File(picked.path));
-      }
-      final downloadUrl = await storageRef.getDownloadURL();
-
-      await FirebaseFirestore.instance
-          .collection(AppCollections.users)
-          .doc(uid)
-          .update({AppFields.userQrCodeUrlSnake: downloadUrl});
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('QR code updated.')),
-        );
-        setState(() {});
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _uploadingQr = false);
-      }
-    }
-  }
 
   Future<String> _resolveSenderName(
     String userId,
@@ -220,186 +158,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                         const PaymentBanner(
                           message: 'Ride group chat is active.',
                         ),
-                        FutureBuilder<_RideQrInfo>(
-                          future: _loadRideQrInfo(group, request.creatorId),
-                          builder: (context, qrSnapshot) {
-                            if (qrSnapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const SizedBox.shrink();
-                            }
 
-                            final qrInfo = qrSnapshot.data;
-                            if (qrInfo == null) {
-                              return const SizedBox.shrink();
-                            }
 
-                            final canUpload =
-                                currentUid == request.creatorId ||
-                                currentUid == qrInfo.bookedByUserId;
-                            final hasQr = qrInfo.qrCodeUrl.isNotEmpty;
-
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Card(
-                                elevation: 0,
-                                color: const Color(0xFFF8FBFF),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Ride QR Code',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        group?.driverId.isNotEmpty == true
-                                            ? 'Uploaded by driver'
-                                            : 'Uploaded by creator',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      if (hasQr)
-                                        Image.network(
-                                          qrInfo.qrCodeUrl,
-                                          height: 180,
-                                          fit: BoxFit.contain,
-                                        )
-                                      else
-                                        const Text('No QR code uploaded yet.'),
-                                      if (canUpload) ...[
-                                        const SizedBox(height: 8),
-                                        OutlinedButton.icon(
-                                          onPressed: _uploadingQr
-                                              ? null
-                                              : _uploadQrCode,
-                                          icon: _uploadingQr
-                                              ? const SizedBox(
-                                                  height: 16,
-                                                  width: 16,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                  ),
-                                                )
-                                              : const Icon(Icons.upload),
-                                          label: Text(
-                                            hasQr ? 'Update QR' : 'Add QR',
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        FutureBuilder<RidePaymentModel?>(
-                          future: _paymentService.getPayment(widget.requestId),
-                          builder: (context, paymentSnapshot) {
-                            final payment = paymentSnapshot.data;
-                            if (payment == null || payment.qrCodeUrl.isEmpty) {
-                              return const SizedBox.shrink();
-                            }
-
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Card(
-                                elevation: 0,
-                                color: const Color(0xFFF8FBFF),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Ride Payment QR',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Image.network(
-                                        payment.qrCodeUrl,
-                                        height: 180,
-                                        fit: BoxFit.contain,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Scan this code to complete the ride payment.',
-                                        style:
-                                            Theme.of(context).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        if (request.status == CarpoolRequestStatuses.inProgress &&
-                            isAdmin) ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _endingRide
-                                  ? null
-                                  : () async {
-                                      setState(() => _endingRide = true);
-                                      try {
-                                        await _paymentService.triggerPayment(
-                                          widget.requestId,
-                                        );
-                                        await _carpoolService.updateRequestStatus(
-                                          widget.requestId,
-                                          CarpoolRequestStatuses.completed,
-                                        );
-                                        if (!mounted) return;
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => PaymentScreen(
-                                              requestId: widget.requestId,
-                                            ),
-                                          ),
-                                        );
-                                      } catch (e) {
-                                        if (!mounted) return;
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(content: Text(e.toString())),
-                                        );
-                                      } finally {
-                                        if (mounted) {
-                                          setState(() => _endingRide = false);
-                                        }
-                                      }
-                                    },
-                              child: _endingRide
-                                  ? const SizedBox(
-                                      height: 18,
-                                      width: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('End Ride'),
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -414,6 +174,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                           );
                         }
                         return ListView.builder(
+                          reverse: true,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: chatProvider.messages.length,
                           itemBuilder: (context, index) {

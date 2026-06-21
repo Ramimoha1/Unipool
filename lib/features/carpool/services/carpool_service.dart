@@ -28,10 +28,25 @@ class CarpoolService {
       _firestore.collection(AppCollections.carpoolApplicants);
   CollectionReference<Map<String, dynamic>> get _groups =>
       _firestore.collection(AppCollections.carpoolGroups);
+  CollectionReference<Map<String, dynamic>> get _users =>
+      _firestore.collection(AppCollections.users);
+
+  Future<void> _checkBanStatus(String userId) async {
+    final doc = await _users.doc(userId).get();
+    final data = doc.data();
+    if (data == null) return;
+
+    final status = data[AppFields.userBannedStatus] as String?;
+    if (status != null && status != 'none') {
+      final reason = data[AppFields.userBannedReason] as String? ?? 'No reason provided';
+      throw Exception('BANNED: You are currently banned ($status). Reason: $reason.');
+    }
+  }
 
   /// Creates a new carpool request and seeds its group document.
-  Future<String> createRequest(CarpoolRequestModel request) async {
+  Future<String> createRequest(CarpoolRequestModel request, {bool isCreatorDriver = false}) async {
     try {
+      await _checkBanStatus(request.creatorId);
       // Prevent creating a new request if the user already has an active carpool
       final active = await getActiveCarpoolsForUser(request.creatorId);
       if (active.isNotEmpty) {
@@ -53,7 +68,7 @@ class CarpoolService {
         transaction.set(
           groupRef,
           CarpoolGroupModel(
-            driverId: '',
+            driverId: isCreatorDriver ? request.creatorId : '',
             id: groupRef.id,
             requestId: requestRef.id,
             adminId: request.creatorId,
@@ -166,13 +181,71 @@ class CarpoolService {
       if (!requestDoc.exists) {
         throw Exception('Request not found.');
       }
-      if ((requestDoc.data()?[AppFields.creatorId] as String?) != currentUid) {
-        throw Exception('Only the creator can update the request status.');
-      }
+      final isCreator = (requestDoc.data()?[AppFields.creatorId] as String?) == currentUid;
+      final groupDoc = await _groups.doc(requestId).get();
+      final isDriver = groupDoc.exists && (groupDoc.data()?[AppFields.driverId] as String?) == currentUid;
 
+      if (!isCreator && !isDriver) {
+        throw Exception('Only the creator or assigned driver can update the request status.');
+      }
       await _requests.doc(requestId).update({AppFields.status: status});
     } catch (error) {
       throw Exception('Failed to update request: $error');
+    }
+  }
+
+  /// Updates settings of a request.
+  Future<void> updateRequestSettings(String requestId, Map<String, dynamic> updates) async {
+    try {
+      final currentUid = _auth.currentUser!.uid;
+      final requestDoc = await _requests.doc(requestId).get();
+      if (!requestDoc.exists) {
+        throw Exception('Request not found.');
+      }
+      if ((requestDoc.data()?[AppFields.creatorId] as String?) != currentUid) {
+        throw Exception('Only the creator can update the request settings.');
+      }
+
+      await _requests.doc(requestId).update(updates);
+    } catch (error) {
+      throw Exception('Failed to update request settings: $error');
+    }
+  }
+
+  /// Transfers creator ownership of a request to a new member.
+  Future<void> transferCreator(String requestId, String newCreatorId) async {
+    try {
+      final currentUid = _auth.currentUser!.uid;
+      final requestDoc = await _requests.doc(requestId).get();
+      if (!requestDoc.exists) {
+        throw Exception('Request not found.');
+      }
+      if ((requestDoc.data()?[AppFields.creatorId] as String?) != currentUid) {
+        throw Exception('Only the creator can transfer ownership.');
+      }
+
+      await _firestore.runTransaction((transaction) async {
+        final groupRef = _groups.doc(requestId);
+        final groupDoc = await transaction.get(groupRef);
+        if (!groupDoc.exists) {
+          throw Exception('Group not found.');
+        }
+
+        final groupData = groupDoc.data()!;
+        final memberIds = List<String>.from(groupData[AppFields.memberIds] ?? []);
+        if (!memberIds.contains(newCreatorId)) {
+          throw Exception('New creator must be a current member of the group.');
+        }
+
+        transaction.update(_requests.doc(requestId), {
+          AppFields.creatorId: newCreatorId,
+        });
+        transaction.update(groupRef, {
+          AppFields.adminId: newCreatorId,
+        });
+      });
+    } catch (error) {
+      throw Exception('Failed to transfer creator: $error');
     }
   }
 
@@ -201,6 +274,7 @@ class CarpoolService {
     String role,
   ) async {
     try {
+      await _checkBanStatus(userId);
       // Disallow applying to other requests when user already has an active carpool
       final active = await getActiveCarpoolsForUser(userId);
       if (active.isNotEmpty) {
@@ -342,6 +416,23 @@ class CarpoolService {
       );
     } catch (error) {
       throw Exception('Failed to submit application: $error');
+    }
+  }
+
+  /// Withdraws a pending application.
+  Future<void> withdrawApplication(String applicantId) async {
+    try {
+      final currentUid = _auth.currentUser!.uid;
+      final applicantDoc = await _applicants.doc(applicantId).get();
+      if (!applicantDoc.exists) {
+        throw Exception('Application not found.');
+      }
+      if (applicantDoc.data()![AppFields.userId] != currentUid) {
+        throw Exception('You can only withdraw your own application.');
+      }
+      await _applicants.doc(applicantId).delete();
+    } catch (error) {
+      throw Exception('Failed to withdraw application: $error');
     }
   }
 
@@ -584,16 +675,22 @@ class CarpoolService {
           .get();
 
       await _firestore.runTransaction((transaction) async {
+        DocumentSnapshot<Map<String, dynamic>>? requestDoc;
+        final acceptedRole = application.docs.isNotEmpty
+            ? application.docs.first.data()[AppFields.applicantRole] as String?
+            : null;
+
+        if (acceptedRole == CarpoolApplicantRoles.passenger) {
+          requestDoc = await transaction.get(requestRef);
+        }
+
         final updatedMembers = List<String>.from(group.memberIds)
           ..remove(userId);
         transaction.update(groupRef, {AppFields.memberIds: updatedMembers});
 
         if (application.docs.isNotEmpty) {
           final acceptedDoc = application.docs.first;
-          final acceptedData = acceptedDoc.data();
-          final acceptedRole = acceptedData[AppFields.applicantRole] as String?;
-          if (acceptedRole == CarpoolApplicantRoles.passenger) {
-            final requestDoc = await transaction.get(requestRef);
+          if (acceptedRole == CarpoolApplicantRoles.passenger && requestDoc != null) {
             final requestData = requestDoc.data() ?? <String, dynamic>{};
             final availableSeats =
                 (requestData[AppFields.availableSeats] as num?)?.toInt() ?? 0;
@@ -610,9 +707,7 @@ class CarpoolService {
           if (acceptedRole == CarpoolApplicantRoles.driver) {
             transaction.update(groupRef, {AppFields.driverId: ''});
           }
-          transaction.update(_applicants.doc(acceptedDoc.id), {
-            AppFields.applicantStatus: CarpoolApplicantStatuses.rejected,
-          });
+          transaction.delete(_applicants.doc(acceptedDoc.id));
         }
       });
     } catch (error) {
@@ -653,16 +748,22 @@ class CarpoolService {
           .get();
 
       await _firestore.runTransaction((transaction) async {
+        DocumentSnapshot<Map<String, dynamic>>? requestDoc;
+        final acceptedRole = application.docs.isNotEmpty
+            ? application.docs.first.data()[AppFields.applicantRole] as String?
+            : null;
+
+        if (acceptedRole == CarpoolApplicantRoles.passenger) {
+          requestDoc = await transaction.get(requestRef);
+        }
+
         final updatedMembers = List<String>.from(group.memberIds)
           ..remove(targetUserId);
         transaction.update(groupRef, {AppFields.memberIds: updatedMembers});
 
         if (application.docs.isNotEmpty) {
           final acceptedDoc = application.docs.first;
-          final acceptedData = acceptedDoc.data();
-          final acceptedRole = acceptedData[AppFields.applicantRole] as String?;
-          if (acceptedRole == CarpoolApplicantRoles.passenger) {
-            final requestDoc = await transaction.get(requestRef);
+          if (acceptedRole == CarpoolApplicantRoles.passenger && requestDoc != null) {
             final requestData = requestDoc.data() ?? <String, dynamic>{};
             final availableSeats =
                 (requestData[AppFields.availableSeats] as num?)?.toInt() ?? 0;
@@ -679,9 +780,7 @@ class CarpoolService {
           if (acceptedRole == CarpoolApplicantRoles.driver) {
             transaction.update(groupRef, {AppFields.driverId: ''});
           }
-          transaction.update(_applicants.doc(acceptedDoc.id), {
-            AppFields.applicantStatus: CarpoolApplicantStatuses.rejected,
-          });
+          transaction.delete(_applicants.doc(acceptedDoc.id));
         }
       });
 
@@ -702,6 +801,8 @@ class CarpoolService {
     required String targetUserId,
     required String reason,
     required String description,
+    required List<String> attachmentUrls,
+    required List<Map<String, dynamic>> chatSnapshot,
   }) async {
     try {
       final group = await getGroupByRequestId(requestId);
@@ -719,6 +820,8 @@ class CarpoolService {
         AppFields.description: description,
         AppFields.status: CarpoolReportStatuses.open,
         AppFields.createdAt: Timestamp.now(),
+        AppFields.attachmentUrls: attachmentUrls,
+        AppFields.chatSnapshot: chatSnapshot,
       });
     } catch (error) {
       throw Exception('Failed to create report: $error');
