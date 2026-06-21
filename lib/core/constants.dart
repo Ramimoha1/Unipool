@@ -75,6 +75,12 @@ class AppFields {
   static const paymentStatus = 'status';
   static const confirmedBy = 'confirmed_by';
 
+  // Bank details fields (nested map on user doc)
+  static const bankDetails = 'bankDetails';
+  static const bankName = 'bankName';
+  static const accountHolderName = 'accountHolderName';
+  static const accountNumber = 'accountNumber';
+
   // Report fields
   static const reportedBy = 'reported_by';
   static const targetUserId = 'target_user_id';

@@ -5,6 +5,7 @@ import 'package:unipool/core/widgets/app_bottom_nav.dart';
 import '../data/driver_verification_repository.dart';
 import 'apply_driver_screen.dart';
 import 'package:unipool/features/profile/presentation/account_settings_screen.dart';
+import 'package:unipool/features/profile/presentation/payment_settings_screen.dart';
 import 'package:unipool/features/auth/presentation/auth_gate.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -625,7 +626,12 @@ class _QuickActionsCard extends StatelessWidget {
               icon: Icons.credit_card_outlined,
               iconColor: const Color(0xFF2563EB),
               label: 'Payment Settings',
-              isLast: true),
+              isLast: true,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const PaymentSettingsScreen()),
+              )),
         ],
       ),
     );
@@ -638,19 +644,21 @@ class _ActionRow extends StatelessWidget {
     required this.iconColor,
     required this.label,
     this.isLast = false,
+    this.onTap,
   });
 
   final IconData icon;
   final Color iconColor;
   final String label;
   final bool isLast;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         InkWell(
-          onTap: () {},
+          onTap: onTap ?? () {},
           borderRadius: BorderRadius.circular(10),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
