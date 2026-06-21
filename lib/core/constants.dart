@@ -77,6 +77,7 @@ class AppFields {
   static const qrCodeUrl = 'qr_code_url';
   static const totalAmount = 'total_amount';
   static const splitAmount = 'split_amount';
+  static const passengerDues = 'passenger_dues';
   static const paymentStatus = 'status';
   static const confirmedBy = 'confirmed_by';
   static const payeeBankSnapshot = 'payee_bank_snapshot';
@@ -163,6 +164,7 @@ class CarpoolApplicantStatuses {
 
 class CarpoolPaymentStatuses {
   static const pending = 'pending';
+  static const awaitingPayment = 'awaiting_payment';
   static const settled = 'settled';
 }
 
