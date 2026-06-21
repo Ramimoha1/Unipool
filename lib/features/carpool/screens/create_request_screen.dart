@@ -162,6 +162,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       allowUnverifiedDriver: _allowUnverifiedDriver,
       status: CarpoolRequestStatuses.open,
       createdAt: DateTime.now(),
+      fare: double.tryParse(_totalAmountController.text.trim()),
     );
 
     setState(() => _saving = true);

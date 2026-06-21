@@ -29,7 +29,7 @@ class PickLocationScreen extends StatefulWidget {
 }
 
 class _PickLocationScreenState extends State<PickLocationScreen> {
-  static const LatLng _defaultCenter = LatLng(1.2966, 103.7764);
+  static const LatLng _utmMalaysia = LatLng(1.5594, 103.6386);
 
   final _searchController = TextEditingController();
   GoogleMapController? _mapController;
@@ -56,8 +56,12 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
     );
     _currentTarget = (widget.initialLat != null && widget.initialLng != null)
         ? LatLng(widget.initialLat!, widget.initialLng!)
-        : _defaultCenter;
+        : _utmMalaysia;
     _currentLabel = widget.initialLabel;
+
+    if (widget.initialLat == null && widget.initialLng == null) {
+      _moveToCurrentLocation(silent: true);
+    }
   }
 
   @override
@@ -253,7 +257,7 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
     }
   }
 
-  Future<void> _moveToCurrentLocation() async {
+  Future<void> _moveToCurrentLocation({bool silent = false}) async {
     try {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -261,7 +265,7 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        _showMessage('Location permission denied.');
+        if (!silent) _showMessage('Location permission denied.');
         return;
       }
 
@@ -285,7 +289,7 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
       );
       await _updateLabelFromCoordinates(target, fallback: 'Current location');
     } catch (_) {
-      _showMessage('Failed to get current location.');
+      if (!silent) _showMessage('Failed to get current location.');
     }
   }
 
@@ -526,7 +530,7 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
                   ),
                 ),
                 IconButton(
-                  onPressed: _moveToCurrentLocation,
+                  onPressed: () => _moveToCurrentLocation(silent: false),
                   icon: const Icon(Icons.my_location),
                   tooltip: 'Use current location',
                 ),

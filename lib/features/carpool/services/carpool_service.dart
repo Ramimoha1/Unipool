@@ -176,6 +176,24 @@ class CarpoolService {
     }
   }
 
+  /// Updates settings of a request.
+  Future<void> updateRequestSettings(String requestId, Map<String, dynamic> updates) async {
+    try {
+      final currentUid = _auth.currentUser!.uid;
+      final requestDoc = await _requests.doc(requestId).get();
+      if (!requestDoc.exists) {
+        throw Exception('Request not found.');
+      }
+      if ((requestDoc.data()?[AppFields.creatorId] as String?) != currentUid) {
+        throw Exception('Only the creator can update the request settings.');
+      }
+
+      await _requests.doc(requestId).update(updates);
+    } catch (error) {
+      throw Exception('Failed to update request settings: $error');
+    }
+  }
+
   /// Deletes a request if the current user is the creator.
   Future<void> deleteRequest(String requestId) async {
     try {
@@ -342,6 +360,23 @@ class CarpoolService {
       );
     } catch (error) {
       throw Exception('Failed to submit application: $error');
+    }
+  }
+
+  /// Withdraws a pending application.
+  Future<void> withdrawApplication(String applicantId) async {
+    try {
+      final currentUid = _auth.currentUser!.uid;
+      final applicantDoc = await _applicants.doc(applicantId).get();
+      if (!applicantDoc.exists) {
+        throw Exception('Application not found.');
+      }
+      if (applicantDoc.data()![AppFields.userId] != currentUid) {
+        throw Exception('You can only withdraw your own application.');
+      }
+      await _applicants.doc(applicantId).delete();
+    } catch (error) {
+      throw Exception('Failed to withdraw application: $error');
     }
   }
 
@@ -584,16 +619,22 @@ class CarpoolService {
           .get();
 
       await _firestore.runTransaction((transaction) async {
+        DocumentSnapshot<Map<String, dynamic>>? requestDoc;
+        final acceptedRole = application.docs.isNotEmpty
+            ? application.docs.first.data()[AppFields.applicantRole] as String?
+            : null;
+
+        if (acceptedRole == CarpoolApplicantRoles.passenger) {
+          requestDoc = await transaction.get(requestRef);
+        }
+
         final updatedMembers = List<String>.from(group.memberIds)
           ..remove(userId);
         transaction.update(groupRef, {AppFields.memberIds: updatedMembers});
 
         if (application.docs.isNotEmpty) {
           final acceptedDoc = application.docs.first;
-          final acceptedData = acceptedDoc.data();
-          final acceptedRole = acceptedData[AppFields.applicantRole] as String?;
-          if (acceptedRole == CarpoolApplicantRoles.passenger) {
-            final requestDoc = await transaction.get(requestRef);
+          if (acceptedRole == CarpoolApplicantRoles.passenger && requestDoc != null) {
             final requestData = requestDoc.data() ?? <String, dynamic>{};
             final availableSeats =
                 (requestData[AppFields.availableSeats] as num?)?.toInt() ?? 0;
@@ -610,9 +651,7 @@ class CarpoolService {
           if (acceptedRole == CarpoolApplicantRoles.driver) {
             transaction.update(groupRef, {AppFields.driverId: ''});
           }
-          transaction.update(_applicants.doc(acceptedDoc.id), {
-            AppFields.applicantStatus: CarpoolApplicantStatuses.rejected,
-          });
+          transaction.delete(_applicants.doc(acceptedDoc.id));
         }
       });
     } catch (error) {
@@ -653,16 +692,22 @@ class CarpoolService {
           .get();
 
       await _firestore.runTransaction((transaction) async {
+        DocumentSnapshot<Map<String, dynamic>>? requestDoc;
+        final acceptedRole = application.docs.isNotEmpty
+            ? application.docs.first.data()[AppFields.applicantRole] as String?
+            : null;
+
+        if (acceptedRole == CarpoolApplicantRoles.passenger) {
+          requestDoc = await transaction.get(requestRef);
+        }
+
         final updatedMembers = List<String>.from(group.memberIds)
           ..remove(targetUserId);
         transaction.update(groupRef, {AppFields.memberIds: updatedMembers});
 
         if (application.docs.isNotEmpty) {
           final acceptedDoc = application.docs.first;
-          final acceptedData = acceptedDoc.data();
-          final acceptedRole = acceptedData[AppFields.applicantRole] as String?;
-          if (acceptedRole == CarpoolApplicantRoles.passenger) {
-            final requestDoc = await transaction.get(requestRef);
+          if (acceptedRole == CarpoolApplicantRoles.passenger && requestDoc != null) {
             final requestData = requestDoc.data() ?? <String, dynamic>{};
             final availableSeats =
                 (requestData[AppFields.availableSeats] as num?)?.toInt() ?? 0;
@@ -679,9 +724,7 @@ class CarpoolService {
           if (acceptedRole == CarpoolApplicantRoles.driver) {
             transaction.update(groupRef, {AppFields.driverId: ''});
           }
-          transaction.update(_applicants.doc(acceptedDoc.id), {
-            AppFields.applicantStatus: CarpoolApplicantStatuses.rejected,
-          });
+          transaction.delete(_applicants.doc(acceptedDoc.id));
         }
       });
 

@@ -174,6 +174,21 @@ class CarpoolProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> withdrawApplication(String applicantId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.withdrawApplication(applicantId);
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> acceptApplicant(
     String requestId,
     String applicantId,
@@ -214,6 +229,21 @@ class CarpoolProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _service.updateRequestStatus(requestId, status);
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateRequestSettings(String requestId, Map<String, dynamic> updates) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _service.updateRequestSettings(requestId, updates);
     } catch (exception) {
       error = exception.toString();
       rethrow;

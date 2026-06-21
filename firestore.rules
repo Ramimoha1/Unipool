@@ -50,7 +50,12 @@ service cloud.firestore {
           || isGroupMember(requestId)
         );
       allow create: if isSignedIn() && request.resource.data.creator_id == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.creator_id == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.creator_id == request.auth.uid ||
+        resource.data.status == 'open' ||
+        isGroupMember(requestId)
+      );
+      allow delete: if isSignedIn() && resource.data.creator_id == request.auth.uid;
     }
 
     match /carpool_applicants/{applicantId} {
@@ -59,8 +64,14 @@ service cloud.firestore {
         requestDoc(resource.data.request_id).data.creator_id == request.auth.uid
       );
       allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
-      allow update: if isSignedIn() && requestDoc(resource.data.request_id).data.creator_id == request.auth.uid;
-      allow delete: if false;
+      allow update: if isSignedIn() && (
+        requestDoc(resource.data.request_id).data.creator_id == request.auth.uid ||
+        resource.data.user_id == request.auth.uid
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.user_id == request.auth.uid ||
+        requestDoc(resource.data.request_id).data.creator_id == request.auth.uid
+      );
     }
 
     match /carpool_groups/{requestId} {
@@ -70,7 +81,11 @@ service cloud.firestore {
         || requestDoc(requestId).data.creator_id == request.auth.uid
         || requestDoc(requestId).data.status == 'open'
       );
-      allow update: if isSignedIn() && resource.data.admin_id == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.admin_id == request.auth.uid ||
+        requestDoc(requestId).data.status == 'open' ||
+        resource.data.member_ids.hasAny([request.auth.uid])
+      );
       allow delete: if false;
 
       match /messages/{messageId} {

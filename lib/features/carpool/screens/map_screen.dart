@@ -198,7 +198,14 @@ class _MapScreenState extends State<MapScreen> {
                   myLocationEnabled: _locationEnabled,
                   myLocationButtonEnabled: _locationEnabled,
                   markers: markers,
-                  onMapCreated: (controller) => _mapController = controller,
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                    if (_locationEnabled) {
+                      _mapController?.animateCamera(
+                        CameraUpdate.newLatLngZoom(_center, 14),
+                      );
+                    }
+                  },
                 ),
                 DraggableScrollableSheet(
                   initialChildSize: 0.3,

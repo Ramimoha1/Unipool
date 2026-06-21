@@ -45,6 +45,7 @@ class AppFields {
   static const status = 'status';
   static const createdAt = 'created_at';
   static const updatedAt = 'updated_at';
+  static const fare = 'fare';
 
   // Carpool applicant fields
   static const requestId = 'request_id';

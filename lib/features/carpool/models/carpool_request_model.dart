@@ -19,6 +19,7 @@ class CarpoolRequestModel {
     required this.joinMode,
     required this.status,
     required this.createdAt,
+    this.fare,
   });
 
   final String id;
@@ -37,6 +38,7 @@ class CarpoolRequestModel {
   final String joinMode;
   final String status;
   final DateTime createdAt;
+  final double? fare;
 
   factory CarpoolRequestModel.fromMap(Map<String, dynamic> map, String id) {
     return CarpoolRequestModel(
@@ -56,6 +58,7 @@ class CarpoolRequestModel {
       joinMode: map[AppFields.joinMode] as String? ?? CarpoolJoinModes.approval,
       status: map[AppFields.status] as String? ?? CarpoolRequestStatuses.open,
       createdAt: (map[AppFields.createdAt] as Timestamp?)?.toDate() ?? DateTime.now(),
+      fare: (map[AppFields.fare] as num?)?.toDouble(),
     );
   }
 
@@ -76,6 +79,7 @@ class CarpoolRequestModel {
       AppFields.joinMode: joinMode,
       AppFields.status: status,
       AppFields.createdAt: Timestamp.fromDate(createdAt),
+      if (fare != null) AppFields.fare: fare,
     };
   }
 
@@ -96,6 +100,7 @@ class CarpoolRequestModel {
     String? joinMode,
     String? status,
     DateTime? createdAt,
+    double? fare,
   }) {
     return CarpoolRequestModel(
       id: id ?? this.id,
@@ -114,6 +119,7 @@ class CarpoolRequestModel {
       joinMode: joinMode ?? this.joinMode,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      fare: fare ?? this.fare,
     );
   }
 }
