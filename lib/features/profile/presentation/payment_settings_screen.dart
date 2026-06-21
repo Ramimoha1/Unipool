@@ -40,12 +40,21 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
   }
 
   Future<void> _loadData() async {
-    final details = await _repo.getBankDetails(_user.uid);
-    if (!mounted) return;
-    setState(() {
-      _details = details;
-      _loading = false;
-    });
+    try {
+      final details = await _repo.getBankDetails(_user.uid);
+      if (!mounted) return;
+      setState(() {
+        _details = details;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading bank details: $e');
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+      });
+      _showError('Failed to load payment settings. Please check your connection or firestore rules.');
+    }
   }
 
   // ─── QR Upload ──────────────────────────────────────────────────────────

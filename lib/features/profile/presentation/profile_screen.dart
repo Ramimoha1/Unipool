@@ -7,7 +7,11 @@ import 'apply_driver_screen.dart';
 import 'package:unipool/features/profile/presentation/account_settings_screen.dart';
 import 'package:unipool/features/profile/presentation/payment_settings_screen.dart';
 import 'package:unipool/features/profile/presentation/payment_history_screen.dart';
+import 'package:unipool/features/profile/presentation/report_dispute_history_screen.dart';
 import 'package:unipool/features/auth/presentation/auth_gate.dart';
+import 'package:unipool/features/carpool/services/carpool_service.dart';
+import 'package:unipool/features/carpool/screens/request_detail_screen.dart';
+import 'package:unipool/features/delivery/screens/my_delivery_jobs_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -664,11 +668,51 @@ class _QuickActionsCard extends StatelessWidget {
           _ActionRow(
               icon: Icons.location_on_outlined,
               iconColor: _teal,
-              label: 'My Carpool Requests'),
+              label: 'My Carpool Requests',
+              onTap: () async {
+                final uid = FirebaseAuth.instance.currentUser?.uid;
+                if (uid == null) return;
+                
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => const Center(child: CircularProgressIndicator(color: _teal)),
+                );
+                
+                try {
+                  final carpools = await CarpoolService().getActiveCarpoolsForUser(uid);
+                  if (!context.mounted) return;
+                  Navigator.pop(context); // close dialog
+                  
+                  if (carpools.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RequestDetailScreen(requestId: carpools.first.id),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('You currently have no active carpool session.')),
+                    );
+                  }
+                } catch (e) {
+                  if (!context.mounted) return;
+                  Navigator.pop(context); // close dialog
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }),
           _ActionRow(
               icon: Icons.inventory_2_outlined,
               iconColor: const Color(0xFF7C3AED),
-              label: 'My Delivery Jobs'),
+              label: 'My Delivery Jobs',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const MyDeliveryJobsScreen()),
+              )),
           _ActionRow(
               icon: Icons.history,
               iconColor: Colors.orange,
@@ -682,11 +726,20 @@ class _QuickActionsCard extends StatelessWidget {
               icon: Icons.credit_card_outlined,
               iconColor: const Color(0xFF2563EB),
               label: 'Payment Settings',
-              isLast: true,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
                     builder: (_) => const PaymentSettingsScreen()),
+              )),
+          _ActionRow(
+              icon: Icons.report_gmailerrorred_outlined,
+              iconColor: const Color(0xFFE53935),
+              label: 'My Reports & Disputes',
+              isLast: true,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const ReportDisputeHistoryScreen()),
               )),
         ],
       ),

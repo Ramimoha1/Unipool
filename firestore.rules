@@ -124,7 +124,11 @@ service cloud.firestore {
 
     match /ride_reports/{reportId} {
       allow create: if isSignedIn();
-      allow read, update, delete: if isAdmin();
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.reported_by == request.auth.uid
+      );
+      allow update, delete: if isAdmin();
     }
 
     match /delivery_jobs/{jobId} {
@@ -169,7 +173,8 @@ service cloud.firestore {
       allow read: if isSignedIn() && (
         isAdmin() ||
         resource.data.seller_id == request.auth.uid ||
-        resource.data.driver_id == request.auth.uid
+        resource.data.driver_id == request.auth.uid ||
+        resource.data.filed_by == request.auth.uid
       );
       allow create: if isSignedIn() && (
         request.resource.data.seller_id == request.auth.uid ||
