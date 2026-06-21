@@ -27,6 +27,9 @@ class AppFields {
   static const userIsActive = 'isActive';
   static const userFcmToken = 'fcm_token';
   static const userRole = 'role';
+  static const userBannedStatus = 'bannedStatus';
+  static const userBannedUntil = 'bannedUntil';
+  static const userBannedReason = 'bannedReason';
 
   // Carpool request fields
   static const creatorId = 'creator_id';
@@ -87,6 +90,8 @@ class AppFields {
   static const targetUserId = 'target_user_id';
   static const reason = 'reason';
   static const description = 'description';
+  static const attachmentUrls = 'attachment_urls';
+  static const chatSnapshot = 'chat_snapshot';
 
   // Delivery job fields
   static const sellerId = 'seller_id';

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'admin_driver_applications_screen.dart';
 import 'admin_ban_users_screen.dart';
+import 'admin_review_reports_screen.dart';
 import 'package:unipool/features/auth/presentation/auth_gate.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
@@ -69,7 +70,11 @@ class AdminDashboardScreen extends StatelessWidget {
                     icon: Icons.flag_outlined,
                     iconColor: const Color(0xFF2563EB),
                     label: 'Review Reports',
-                    onTap: () {},
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminReviewReportsScreen()),
+                    ),
                     isLast: true,
                   ),
                 ],

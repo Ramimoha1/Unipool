@@ -28,10 +28,25 @@ class CarpoolService {
       _firestore.collection(AppCollections.carpoolApplicants);
   CollectionReference<Map<String, dynamic>> get _groups =>
       _firestore.collection(AppCollections.carpoolGroups);
+  CollectionReference<Map<String, dynamic>> get _users =>
+      _firestore.collection(AppCollections.users);
+
+  Future<void> _checkBanStatus(String userId) async {
+    final doc = await _users.doc(userId).get();
+    final data = doc.data();
+    if (data == null) return;
+
+    final status = data[AppFields.userBannedStatus] as String?;
+    if (status != null && status != 'none') {
+      final reason = data[AppFields.userBannedReason] as String? ?? 'No reason provided';
+      throw Exception('BANNED: You are currently banned ($status). Reason: $reason.');
+    }
+  }
 
   /// Creates a new carpool request and seeds its group document.
   Future<String> createRequest(CarpoolRequestModel request, {bool isCreatorDriver = false}) async {
     try {
+      await _checkBanStatus(request.creatorId);
       // Prevent creating a new request if the user already has an active carpool
       final active = await getActiveCarpoolsForUser(request.creatorId);
       if (active.isNotEmpty) {
@@ -259,6 +274,7 @@ class CarpoolService {
     String role,
   ) async {
     try {
+      await _checkBanStatus(userId);
       // Disallow applying to other requests when user already has an active carpool
       final active = await getActiveCarpoolsForUser(userId);
       if (active.isNotEmpty) {
@@ -785,6 +801,8 @@ class CarpoolService {
     required String targetUserId,
     required String reason,
     required String description,
+    required List<String> attachmentUrls,
+    required List<Map<String, dynamic>> chatSnapshot,
   }) async {
     try {
       final group = await getGroupByRequestId(requestId);
@@ -802,6 +820,8 @@ class CarpoolService {
         AppFields.description: description,
         AppFields.status: CarpoolReportStatuses.open,
         AppFields.createdAt: Timestamp.now(),
+        AppFields.attachmentUrls: attachmentUrls,
+        AppFields.chatSnapshot: chatSnapshot,
       });
     } catch (error) {
       throw Exception('Failed to create report: $error');

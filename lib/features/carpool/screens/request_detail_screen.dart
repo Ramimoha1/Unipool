@@ -18,6 +18,7 @@ import '../widgets/ride_status_badge.dart';
 import 'end_ride_split_dialog.dart';
 import 'group_chat_screen.dart';
 import 'payment_screen.dart';
+import 'report_screen.dart';
 
 class RequestDetailScreen extends StatefulWidget {
   const RequestDetailScreen({super.key, required this.requestId});
@@ -175,25 +176,34 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
         final request = requestSnapshot.data!;
         final isCreator = request.creatorId == currentUid;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Request Details'),
-            actions: [
-              if (isCreator)
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () => _showEditSettingsDialog(context, request),
-                ),
-            ],
-          ),
-          body: FutureBuilder(
-            future: _service.getGroupByRequestId(widget.requestId),
-            builder: (context, groupSnapshot) {
-              final group = groupSnapshot.data;
-              final isMember = group?.memberIds.contains(currentUid) ?? false;
-              final isAdmin = group?.adminId == currentUid;
+        return FutureBuilder(
+          future: _service.getGroupByRequestId(widget.requestId),
+          builder: (context, groupSnapshot) {
+            final group = groupSnapshot.data;
+            final isMember = group?.memberIds.contains(currentUid) ?? false;
+            final isAdmin = group?.adminId == currentUid;
 
-              return ListView(
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text('Request Details'),
+                actions: [
+                  if (isMember)
+                    IconButton(
+                      icon: const Icon(Icons.report_problem_outlined, color: Colors.redAccent),
+                      onPressed: () {
+                        if (group != null) {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => ReportScreen(requestId: widget.requestId, groupId: group.id)));
+                        }
+                      },
+                    ),
+                  if (isCreator)
+                    IconButton(
+                      icon: const Icon(Icons.settings),
+                      onPressed: () => _showEditSettingsDialog(context, request),
+                    ),
+                ],
+              ),
+              body: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
                   Card(
@@ -763,9 +773,9 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                     ),
                   ],
                 ],
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       },
     );
