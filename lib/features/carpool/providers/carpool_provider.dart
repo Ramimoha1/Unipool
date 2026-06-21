@@ -226,10 +226,16 @@ class CarpoolProvider extends ChangeNotifier {
   void loadApplicants(String requestId) {
     applicants = [];
     notifyListeners();
-    _service.getApplicants(requestId).listen((items) {
-      applicants = items;
-      notifyListeners();
-    });
+    _service.getApplicants(requestId).listen(
+      (items) {
+        applicants = items;
+        notifyListeners();
+      },
+      onError: (exception) {
+        error = exception.toString();
+        notifyListeners();
+      },
+    );
   }
 
   @override

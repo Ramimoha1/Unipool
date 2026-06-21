@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:unipool/features/carpool/screens/map_screen.dart';
+import 'package:unipool/core/widgets/app_bottom_nav.dart';
 import '../data/driver_verification_repository.dart';
 import 'apply_driver_screen.dart';
+import 'package:unipool/features/profile/presentation/account_settings_screen.dart';
+import 'package:unipool/features/auth/presentation/auth_gate.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,43 +15,26 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // ─── Constants ───────────────────────────────────────────────────────────
   static const Color _teal = Color(0xFF1A9B8A);
-  static const Color _tealLight = Color(0xFFE8F7F5);
-  static const Color _amber = Color(0xFFFFC107);
-  static const Color _amberLight = Color(0xFFFFF8E1);
-  static const Color _red = Color(0xFFE53935);
-  static const Color _redLight = Color(0xFFFFEBEE);
-  static const Color _green = Color(0xFF2E7D32);
-  static const Color _greenLight = Color(0xFFE8F5E9);
-  static const Color _textDark = Color(0xFF1A2332);
-  static const Color _textMuted = Color(0xFF8A96A3);
-  static const Color _border = Color(0xFFE5EAF0);
   static const Color _bgPage = Color(0xFFF7F9FC);
 
   final _repo = DriverVerificationRepository(
     firestore: FirebaseFirestore.instance,
   );
 
-  // ─── Navigation to Apply screen ──────────────────────────────────────────
   Future<void> _goToApply() async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const ApplyDriverScreen()),
     );
-    // `result == true` means the user just submitted — the stream will refresh
-    // automatically, but setState forces a rebuild just in case.
     if (result == true && mounted) setState(() {});
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('Not logged in.')),
-      );
+      return const Scaffold(body: Center(child: Text('Not logged in.')));
     }
 
     return Scaffold(
@@ -58,24 +43,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         stream: _repo.userStream(user.uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: _teal),
-            );
+            return const Center(child: CircularProgressIndicator(color: _teal));
           }
 
           final userData = snapshot.data ?? {};
           final verificationStatus =
               userData['verificationStatus'] as String? ?? 'unverified';
-          final userType = userData['userType'] as String? ?? 'student';
-          final fullName = userData['fullName'] as String? ?? user.displayName ?? 'User';
+          final roles = (userData['roles'] as List<dynamic>?)?.cast<String>() ?? ['student'];
+          final fullName =
+              userData['fullName'] as String? ?? user.displayName ?? 'User';
           final university = userData['university'] as String? ?? '';
+          final photoUrl = userData['profilePhotoUrl'] as String?;
           final rides = userData['totalRides'] as int? ?? 0;
           final deliveries = userData['totalDeliveries'] as int? ?? 0;
           final rating = (userData['rating'] as num?)?.toDouble() ?? 0.0;
+          // Admin rejection note (written by admin when rejecting driver app)
+          final rejectionNote = userData['rejectionNote'] as String?;
 
           return CustomScrollView(
             slivers: [
-              _buildAppBar(fullName, university, verificationStatus),
+              _buildAppBar(fullName, university, verificationStatus, photoUrl),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -83,14 +70,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _StatsRow(
-                        rides: rides,
-                        deliveries: deliveries,
-                        rating: rating,
-                      ),
+                          rides: rides,
+                          deliveries: deliveries,
+                          rating: rating),
                       const SizedBox(height: 24),
                       _DriverStatusCard(
                         verificationStatus: verificationStatus,
-                        userType: userType,
+                        roles: roles,
+                        rejectionNote: rejectionNote,
                         onApply: _goToApply,
                       ),
                       const SizedBox(height: 24),
@@ -103,91 +90,136 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         },
       ),
-      bottomNavigationBar: _BottomNav(currentIndex: 2),
+      bottomNavigationBar: const AppBottomNav(currentIndex: 2),
     );
   }
 
   SliverAppBar _buildAppBar(
-      String fullName, String university, String verificationStatus) {
+    String fullName,
+    String university,
+    String verificationStatus,
+    String? photoUrl,
+  ) {
+    // expandedHeight needs enough room: status bar + app bar + profile content
     return SliverAppBar(
-      expandedHeight: 180,
+      expandedHeight: 200,
       pinned: true,
       backgroundColor: _teal,
       elevation: 0,
+      // When collapsed, show title
+      title: const Text(
+        'Profile',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      ),
       actions: [
         IconButton(
           icon: const Icon(Icons.settings_outlined, color: Colors.white),
-          onPressed: () {},
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+          ),
         ),
         IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () => FirebaseAuth.instance.signOut(),
-          ),
+          icon: const Icon(Icons.logout, color: Colors.white),
+          onPressed: () async {
+            await FirebaseAuth.instance.signOut();
+            if (context.mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const AuthGate()),
+                (route) => false,
+              );
+            }
+          },
+        ),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          color: _teal,
-          padding: const EdgeInsets.fromLTRB(20, 70, 20, 20),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: Colors.white.withOpacity(0.25),
-                child: Text(
-                  _initials(fullName),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+        // Disable the built-in title so our custom content doesn't clash
+        title: null,
+        collapseMode: CollapseMode.pin,
+        background: SafeArea(
+          child: Padding(
+            // top: leave room for the appbar row (~56px) + a little breathing
+            padding: const EdgeInsets.fromLTRB(20, 64, 20, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // ── Avatar ──────────────────────────────────────────────
+                _ProfileAvatar(photoUrl: photoUrl, fullName: fullName),
+                const SizedBox(width: 16),
+                // ── Name / university / badge ────────────────────────────
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fullName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (university.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Student • $university',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      _StatusBadge(verificationStatus),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      fullName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (university.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'Student • $university',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    _StatusBadge(verificationStatus),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        title: const Text(
-          'Profile',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
-        titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
       ),
     );
   }
+}
+
+// ─── Profile Avatar ───────────────────────────────────────────────────────────
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.photoUrl, required this.fullName});
+
+  final String? photoUrl;
+  final String fullName;
 
   String _initials(String name) {
     final parts = name.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    if (parts.isNotEmpty && parts[0].isNotEmpty) return parts[0][0].toUpperCase();
+    if (parts.isNotEmpty && parts[0].isNotEmpty) {
+      return parts[0][0].toUpperCase();
+    }
     return '?';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: 36,
+      backgroundColor: Colors.white.withValues(alpha: 0.25),
+      backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
+      child: photoUrl == null
+          ? Text(
+              _initials(fullName),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            )
+          : null,
+    );
   }
 }
 
@@ -220,7 +252,7 @@ class _StatusBadge extends StatelessWidget {
         ),
       _ => (
           'Not Verified',
-          Colors.white.withOpacity(0.2),
+          Colors.white.withValues(alpha: 0.2),
           Colors.white,
           Icons.info_outline
         ),
@@ -229,9 +261,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
+          color: bg, borderRadius: BorderRadius.circular(20)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -240,10 +270,7 @@ class _StatusBadge extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: fg,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-            ),
+                color: fg, fontSize: 11.5, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -251,14 +278,13 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-// ─── Stats Row ───────────────────────────────────────────────────────────────
+// ─── Stats Row ────────────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
-  const _StatsRow({
-    required this.rides,
-    required this.deliveries,
-    required this.rating,
-  });
+  const _StatsRow(
+      {required this.rides,
+      required this.deliveries,
+      required this.rating});
 
   final int rides;
   final int deliveries;
@@ -273,7 +299,7 @@ class _StatsRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -281,9 +307,15 @@ class _StatsRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _StatCell(value: '$rides', label: 'Rides', color: const Color(0xFF1A9B8A)),
+          _StatCell(
+              value: '$rides',
+              label: 'Rides',
+              color: const Color(0xFF1A9B8A)),
           _Divider(),
-          _StatCell(value: '$deliveries', label: 'Deliveries', color: const Color(0xFF7C3AED)),
+          _StatCell(
+              value: '$deliveries',
+              label: 'Deliveries',
+              color: const Color(0xFF7C3AED)),
           _Divider(),
           _StatCell(
             value: rating > 0 ? rating.toStringAsFixed(1) : '—',
@@ -297,7 +329,8 @@ class _StatsRow extends StatelessWidget {
 }
 
 class _StatCell extends StatelessWidget {
-  const _StatCell({required this.value, required this.label, required this.color});
+  const _StatCell(
+      {required this.value, required this.label, required this.color});
   final String value;
   final String label;
   final Color color;
@@ -307,19 +340,15 @@ class _StatCell extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: color)),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF8A96A3)),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF8A96A3))),
         ],
       ),
     );
@@ -328,9 +357,8 @@ class _StatCell extends StatelessWidget {
 
 class _Divider extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 36, color: const Color(0xFFE5EAF0));
-  }
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 36, color: const Color(0xFFE5EAF0));
 }
 
 // ─── Driver Status Card ───────────────────────────────────────────────────────
@@ -338,18 +366,23 @@ class _Divider extends StatelessWidget {
 class _DriverStatusCard extends StatelessWidget {
   const _DriverStatusCard({
     required this.verificationStatus,
-    required this.userType,
+    required this.roles,
     required this.onApply,
+    this.rejectionNote,
   });
 
   final String verificationStatus;
-  final String userType;
+  final List<String> roles;
   final VoidCallback onApply;
+  final String? rejectionNote;
 
   static const Color _teal = Color(0xFF1A9B8A);
+  static const Color _red = Color(0xFFE53935);
 
   @override
   Widget build(BuildContext context) {
+    final isRejected = verificationStatus == 'rejected';
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -357,7 +390,7 @@ class _DriverStatusCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -369,16 +402,37 @@ class _DriverStatusCard extends StatelessWidget {
           const Text(
             'Driver Status',
             style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A2332),
-            ),
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A2332)),
           ),
           const SizedBox(height: 14),
           _StatusDetail(verificationStatus: verificationStatus),
+
+          // ── Rejection note button ────────────────────────────────────
+          if (isRejected) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => _showRejectionNote(context),
+              icon: const Icon(Icons.info_outline, size: 16),
+              label: const Text('View reason from admin'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _red,
+                side: const BorderSide(color: Color(0xFFE53935)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                textStyle: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+
+          // ── Apply / re-apply link ────────────────────────────────────
           if (verificationStatus != 'approved' &&
               verificationStatus != 'verified_driver') ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             GestureDetector(
               onTap: verificationStatus == 'pending' ? null : onApply,
               child: Text(
@@ -393,13 +447,72 @@ class _DriverStatusCard extends StatelessWidget {
                       ? const Color(0xFF8A96A3)
                       : _teal,
                   fontWeight: FontWeight.w600,
-                  decoration: verificationStatus != 'pending'
-                      ? TextDecoration.none
-                      : null,
                 ),
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  void _showRejectionNote(BuildContext context) {
+    final note = (rejectionNote != null && rejectionNote!.trim().isNotEmpty)
+        ? rejectionNote!.trim()
+        : 'No specific reason was provided by the admin.';
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.cancel_outlined, color: Color(0xFFE53935), size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Rejection Reason',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A2332)),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF5F5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Text(
+                note,
+                style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF374151),
+                    height: 1.5),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'You may re-apply after addressing the issue above.',
+              style:
+                  TextStyle(fontSize: 12.5, color: Color(0xFF8A96A3)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close',
+                style: TextStyle(color: Color(0xFF1A9B8A))),
+          ),
         ],
       ),
     );
@@ -447,9 +560,7 @@ class _StatusDetail extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(10),
-      ),
+          color: bgColor, borderRadius: BorderRadius.circular(10)),
       child: Row(
         children: [
           Icon(icon, color: iconColor, size: 22),
@@ -457,18 +568,14 @@ class _StatusDetail extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                  color: iconColor,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
+              Text(title,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                      color: iconColor)),
+              Text(subtitle,
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF6B7280))),
             ],
           ),
         ],
@@ -491,7 +598,7 @@ class _QuickActionsCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -500,31 +607,25 @@ class _QuickActionsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Quick Actions',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A2332),
-            ),
-          ),
+          const Text('Quick Actions',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A2332))),
           const SizedBox(height: 8),
           _ActionRow(
-            icon: Icons.location_on_outlined,
-            iconColor: _teal,
-            label: 'My Carpool Requests',
-          ),
+              icon: Icons.location_on_outlined,
+              iconColor: _teal,
+              label: 'My Carpool Requests'),
           _ActionRow(
-            icon: Icons.inventory_2_outlined,
-            iconColor: const Color(0xFF7C3AED),
-            label: 'My Delivery Jobs',
-          ),
+              icon: Icons.inventory_2_outlined,
+              iconColor: const Color(0xFF7C3AED),
+              label: 'My Delivery Jobs'),
           _ActionRow(
-            icon: Icons.credit_card_outlined,
-            iconColor: const Color(0xFF2563EB),
-            label: 'Payment Settings',
-            isLast: true,
-          ),
+              icon: Icons.credit_card_outlined,
+              iconColor: const Color(0xFF2563EB),
+              label: 'Payment Settings',
+              isLast: true),
         ],
       ),
     );
@@ -559,88 +660,28 @@ class _ActionRow extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
+                    color: iconColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(icon, color: iconColor, size: 18),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF1A2332),
-                    ),
-                  ),
+                  child: Text(label,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1A2332))),
                 ),
-                const Icon(Icons.chevron_right, color: Color(0xFFB0BAC8), size: 20),
+                const Icon(Icons.chevron_right,
+                    color: Color(0xFFB0BAC8), size: 20),
               ],
             ),
           ),
         ),
-        if (!isLast)
-          const Divider(height: 1, color: Color(0xFFEEF2F7)),
+        if (!isLast) const Divider(height: 1, color: Color(0xFFEEF2F7)),
       ],
     );
   }
 }
-
-// ─── Bottom Navigation ────────────────────────────────────────────────────────
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.currentIndex});
-  final int currentIndex;
-
-  static const Color _teal = Color(0xFF1A9B8A);
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      selectedItemColor: _teal,
-      unselectedItemColor: const Color(0xFF8A96A3),
-      selectedLabelStyle:
-          const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5),
-      unselectedLabelStyle: const TextStyle(fontSize: 11.5),
-      backgroundColor: Colors.white,
-      elevation: 8,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.directions_car_outlined),
-          activeIcon: Icon(Icons.directions_car),
-          label: 'Carpool',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.inventory_2_outlined),
-          activeIcon: Icon(Icons.inventory_2),
-          label: 'Delivery',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          activeIcon: Icon(Icons.person),
-          label: 'Profile',
-        ),
-      ],
-      onTap: (index) {
-        if (index == currentIndex) {
-          return;
-        }
-
-        if (index == 0) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MapScreen()),
-          );
-          return;
-        }
-
-        if (index == 1) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Delivery module is not wired yet.')),
-          );
-        }
-      },
-    );
-  }
-}
+

@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'admin_driver_applications_screen.dart';
+import 'admin_ban_users_screen.dart';
+import 'package:unipool/features/auth/presentation/auth_gate.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -40,18 +42,32 @@ class AdminDashboardScreen extends StatelessWidget {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => const AdminDriverApplicationsScreen()),
+                          builder: (_) =>
+                              const AdminDriverApplicationsScreen()),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  _QuickAction(
+                    icon: Icons.block_outlined,
+                    iconColor: const Color(0xFF7C3AED),
+                    label: 'Ban / Suspend Users',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AdminBanUsersScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   _QuickAction(
                     icon: Icons.warning_amber_outlined,
                     iconColor: const Color(0xFFF59E0B),
                     label: 'Resolve Disputes',
                     onTap: () {},
                   ),
+                  const SizedBox(height: 10),
                   _QuickAction(
                     icon: Icons.flag_outlined,
-                    iconColor: const Color(0xFF7C3AED),
+                    iconColor: const Color(0xFF2563EB),
                     label: 'Review Reports',
                     onTap: () {},
                     isLast: true,
@@ -87,34 +103,39 @@ class _AdminHeader extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.shield_outlined, color: Colors.white, size: 22),
+            child: const Icon(Icons.shield_outlined,
+                color: Colors.white, size: 22),
           ),
           const SizedBox(width: 14),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Admin Dashboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  'Platform Moderator',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
-                ),
+                Text('Admin Dashboard',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                Text('Platform Moderator',
+                    style:
+                        TextStyle(color: Colors.white70, fontSize: 13)),
               ],
             ),
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const AuthGate()),
+                  (route) => false,
+                );
+              }
+            },
           ),
         ],
       ),
@@ -141,6 +162,15 @@ class _StatsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _StatCard(
+          icon: Icons.block_outlined,
+          iconColor: const Color(0xFF7C3AED),
+          label: 'Banned Users',
+          collection: 'users',
+          filterField: 'isBanned',
+          filterValue: true,
+        ),
+        const SizedBox(height: 12),
+        _StatCard(
           icon: Icons.warning_amber_outlined,
           iconColor: const Color(0xFFF59E0B),
           label: 'Open Disputes',
@@ -151,7 +181,7 @@ class _StatsSection extends StatelessWidget {
         const SizedBox(height: 12),
         _StatCard(
           icon: Icons.flag_outlined,
-          iconColor: const Color(0xFF7C3AED),
+          iconColor: const Color(0xFF2563EB),
           label: 'Recent Reports',
           collection: 'reports',
           filterField: 'reviewed',
@@ -193,12 +223,10 @@ class _StatCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border(
-              left: BorderSide(color: iconColor, width: 4),
-            ),
+            border: Border(left: BorderSide(color: iconColor, width: 4)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -210,7 +238,7 @@ class _StatCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
+                  color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: iconColor, size: 20),
@@ -220,21 +248,14 @@ class _StatCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                    Text(
-                      '$count',
-                      style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A2332),
-                      ),
-                    ),
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF6B7280))),
+                    Text('$count',
+                        style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A2332))),
                   ],
                 ),
               ),
@@ -265,45 +286,46 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        InkWell(
-          onTap: onTap,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 1),
             ),
-            child: Row(
-              children: [
-                Icon(icon, color: iconColor, size: 22),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF1A2332),
-                    ),
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Color(0xFFB0BAC8)),
-              ],
+                      color: Color(0xFF1A2332))),
             ),
-          ),
+            const Icon(Icons.chevron_right, color: Color(0xFFB0BAC8)),
+          ],
         ),
-        if (!isLast) const SizedBox(height: 10),
-      ],
+      ),
     );
   }
 }

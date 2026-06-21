@@ -143,17 +143,41 @@ class _ApplicationCardState extends State<_ApplicationCard> {
         },
       );
 
-      // Update the user document
-      batch.update(
-        FirebaseFirestore.instance.collection('users').doc(userId),
-        {
-          'verificationStatus': decision,
-          'userType': decision == 'approved' ? 'verified_driver' : 'student',
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-      );
+      // Update the user document — use two separate updates for array operations
+      final userRef = FirebaseFirestore.instance.collection('users').doc(userId);
+
+      // First: shared fields via batch
+      batch.update(userRef, {
+        'verificationStatus': decision,
+        // Write rejection note to user doc so profile screen can display it
+        if (decision == 'rejected' && _noteController.text.trim().isNotEmpty)
+          'rejectionNote': _noteController.text.trim(),
+        if (decision == 'approved')
+          'rejectionNote': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       await batch.commit();
+
+      // Then: array operations + vehicleInfo copy
+      if (decision == 'approved') {
+        // Copy vehicle info from the application to the user document
+        final updateData = <String, dynamic>{
+          'roles': FieldValue.arrayUnion(['verified_driver']),
+        };
+        if (_data['vehicleInfo'] != null) {
+          updateData['vehicleInfo'] = _data['vehicleInfo'];
+        }
+        await userRef.update(updateData);
+        await userRef.update({
+          'roles': FieldValue.arrayRemove(['driver_candidate']),
+        });
+      } else {
+        await userRef.update({
+          'roles': FieldValue.arrayRemove(['driver_candidate']),
+          'vehicleInfo': FieldValue.delete(),
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -209,7 +233,7 @@ class _ApplicationCardState extends State<_ApplicationCard> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -291,9 +315,21 @@ class _ApplicationCardState extends State<_ApplicationCard> {
                         label: "Driver's License",
                         url: _data['driverLicenseUrl'] as String,
                       ),
+                    if (_data['vehicleInfo'] != null &&
+                        (_data['vehicleInfo'] as Map<String, dynamic>)['vehiclePhotoUrl'] != null)
+                      _DocRow(
+                        icon: Icons.directions_car_outlined,
+                        label: 'Vehicle Photo',
+                        url: (_data['vehicleInfo'] as Map<String, dynamic>)['vehiclePhotoUrl'] as String,
+                      ),
                   ],
                 ),
               ),
+              // ── Vehicle Info ──
+              if (_data['vehicleInfo'] != null)
+                _VehicleInfoSection(
+                  vehicleInfo: _data['vehicleInfo'] as Map<String, dynamic>,
+                ),
               // ── Note field ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -433,7 +469,7 @@ class _DocRow extends StatelessWidget {
                       padding: EdgeInsets.all(40),
                       child: CircularProgressIndicator(),
                     ),
-              errorBuilder: (_, __, ___) => const Padding(
+              errorBuilder: (context, error, stackTrace) => const Padding(
                 padding: EdgeInsets.all(40),
                 child: Text('Failed to load image'),
               ),
@@ -441,6 +477,93 @@ class _DocRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Vehicle Info Section ─────────────────────────────────────────────────────
+
+class _VehicleInfoSection extends StatelessWidget {
+  const _VehicleInfoSection({required this.vehicleInfo});
+  final Map<String, dynamic> vehicleInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = vehicleInfo['vehicleType'] as String? ?? 'car';
+    final brand = vehicleInfo['brand'] as String? ?? '—';
+    final model = vehicleInfo['model'] as String? ?? '—';
+    final year = vehicleInfo['year'];
+    final color = vehicleInfo['color'] as String? ?? '—';
+    final plate = vehicleInfo['plateNumber'] as String? ?? '—';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDFA),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFB2F5EA)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  type == 'motorcycle'
+                      ? Icons.two_wheeler_outlined
+                      : Icons.directions_car_outlined,
+                  size: 16,
+                  color: const Color(0xFF1A9B8A),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Vehicle Info — ${type == 'motorcycle' ? 'Motorcycle' : 'Car'}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A9B8A),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 20,
+              runSpacing: 6,
+              children: [
+                _InfoChip(Icons.branding_watermark_outlined, '$brand $model'),
+                if (year != null) _InfoChip(Icons.calendar_today_outlined, '$year'),
+                _InfoChip(Icons.palette_outlined, color),
+                _InfoChip(Icons.pin_outlined, plate),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip(this.icon, this.text);
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: const Color(0xFF6B7280)),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 12.5, color: Color(0xFF374151)),
+        ),
+      ],
     );
   }
 }

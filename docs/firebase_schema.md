@@ -32,8 +32,7 @@ Fields:
 - `fullName` string
 - `email` string
 - `phoneNumber` string
-- `userType` string
-- `roles` array
+- `roles` array  ← single source of truth for user roles
 - `studentIdNumber` string optional
 - `matricNumber` string optional
 - `driverLicenseNumber` string optional
@@ -41,10 +40,18 @@ Fields:
 - `profilePhotoUrl` string optional
 - `verificationStatus` string
 - `isActive` bool
+- `vehicleInfo` map optional ← copied from driverApplication on admin approval
+  - `vehicleType` string (`car` or `motorcycle`)
+  - `brand` string
+  - `model` string
+  - `year` number
+  - `color` string
+  - `plateNumber` string
+  - `vehiclePhotoUrl` string (photo showing plate number)
 - `createdAt` timestamp
 - `updatedAt` timestamp
 
-Suggested `userType` values:
+Suggested `roles` values (a user can have multiple):
 
 - `student`
 - `driver_candidate`
@@ -63,6 +70,13 @@ Fields:
 - `studentCardUrl` string optional
 - `driverLicenseUrl` string optional
 - `vehicleInfo` map optional
+  - `vehicleType` string (`car` or `motorcycle`)
+  - `brand` string (e.g. `Toyota`)
+  - `model` string (e.g. `Vios`)
+  - `year` number (e.g. `2021`)
+  - `color` string (e.g. `White`)
+  - `plateNumber` string (e.g. `ABC 1234`)
+  - `vehiclePhotoUrl` string (photo showing plate number)
 - `notes` string optional
 - `reviewedBy` string optional
 - `reviewedAt` timestamp optional

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:unipool/core/widgets/app_bottom_nav.dart';
 import '../models/carpool_request_model.dart';
 import '../providers/carpool_provider.dart';
 import '../widgets/request_card.dart';
@@ -330,11 +331,12 @@ class _MapScreenState extends State<MapScreen> {
       floatingActionButton: showOnlyMyCarpool
           ? null
           : FloatingActionButton(
-              onPressed: _openCreateRequest,
-              child: const Icon(Icons.add),
-            ),
-    );
-  }
+               onPressed: _openCreateRequest,
+               child: const Icon(Icons.add),
+             ),
+      bottomNavigationBar: const AppBottomNav(currentIndex: 0),
+     );
+   }
 
   Set<Marker> _buildMarkers(List<CarpoolRequestModel> requests) {
     final markers = <Marker>{};

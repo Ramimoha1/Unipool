@@ -4,9 +4,6 @@ import '../data/auth_repository.dart';
 import 'main_authentication_screen.dart';
 import 'package:unipool/features/profile/presentation/profile_screen.dart';
 import 'package:unipool/features/admin/presentation/admin_dashboard_screen.dart';
-// Import your post-login screens here:
-// import 'package:unipool/features/admin/presentation/admin_dashboard_screen.dart';
-// import 'package:unipool/features/home/presentation/home_screen.dart';
 
 /// [AuthGate] sits at the root of the widget tree and listens to Firebase
 /// auth state. It routes the user to the correct screen automatically:
@@ -36,21 +33,21 @@ class AuthGate extends StatelessWidget {
           return const MainAuthenticationScreen();
         }
 
-        // Logged in → resolve user type and route accordingly
-        return FutureBuilder<String?>(
-          future: repo.getUserType(user.uid),
-          builder: (context, typeSnapshot) {
-            if (typeSnapshot.connectionState == ConnectionState.waiting) {
+        // Logged in → resolve user roles and route accordingly
+        return FutureBuilder<List<String>>(
+          future: repo.getUserRoles(user.uid),
+          builder: (context, rolesSnapshot) {
+            if (rolesSnapshot.connectionState == ConnectionState.waiting) {
               return const _SplashScreen();
             }
 
-            final userType = typeSnapshot.data ?? 'student';
+            final roles = rolesSnapshot.data ?? ['student'];
 
-            if (userType == 'admin') {
+            if (roles.contains('admin')) {
               return const AdminDashboardScreen();
             }
 
-            // Default: student / driver / driver_candidate
+            // Default: student / driver / etc.
             return const ProfileScreen();
           },
         );
@@ -70,45 +67,6 @@ class _SplashScreen extends StatelessWidget {
       backgroundColor: Color(0xFF1A9B8A),
       body: Center(
         child: CircularProgressIndicator(color: Colors.white),
-      ),
-    );
-  }
-}
-
-// ─── Placeholder (remove when real screens are wired up) ─────────────────────
-
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: color,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => AuthRepository().signOut(),
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.white24,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Sign Out'),
-            ),
-          ],
-        ),
       ),
     );
   }
