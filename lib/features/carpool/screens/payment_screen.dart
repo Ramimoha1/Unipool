@@ -47,6 +47,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             future: _carpoolService.getGroupByRequestId(widget.requestId),
             builder: (context, groupSnapshot) {
               final members = groupSnapshot.data?.memberIds ?? const [];
+              final isPayee = currentUid == payment.bookedByUserId;
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
@@ -63,7 +64,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             const SizedBox(height: 8),
                             if (payment.bankName.isNotEmpty) Text('Bank: ${payment.bankName}'),
                             if (payment.accountNumber.isNotEmpty) Text('Account: ${payment.accountNumber}'),
-                            if (payment.accountName.isNotEmpty) Text('Name: ${payment.accountName}'),
+                            if (payment.accountHolderName.isNotEmpty) Text('Name: ${payment.accountHolderName}'),
                           ],
                         ),
                       ),
@@ -73,14 +74,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   else if (payment.bankName.isEmpty && payment.accountNumber.isEmpty)
                     const Center(child: Text('Payment details not available yet.')),
                   const SizedBox(height: 16),
-                  Center(child: Text('Amount Due: RM ${(payment.passengerDues[currentUid] ?? 0.0).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+                  if (!isPayee)
+                    Center(child: Text('Amount Due: RM ${payment.splitAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
                   const SizedBox(height: 24),
                   const PaymentBanner(message: 'Confirm payment once you have paid.'),
                   const SizedBox(height: 16),
                   ...members.where((memberId) {
-                    final isPayee = currentUid == payment.bookedByUserId;
                     if (isPayee) {
-                      return memberId != currentUid && (payment.passengerDues[memberId] ?? 0.0) > 0;
+                      return memberId != currentUid;
                     } else {
                       return memberId == currentUid;
                     }
@@ -100,13 +101,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           child: ListTile(
                             leading: Icon(confirmed ? Icons.check_circle : Icons.schedule, color: confirmed ? Colors.green : Colors.grey),
                             title: Text(name),
-                            subtitle: Text('Due: RM ${(payment.passengerDues[memberId] ?? 0.0).toStringAsFixed(2)} • ${confirmed ? 'Paid' : 'Pending'} • ${_verificationLabel(verificationStatus)}'),
+                            subtitle: Text('Due: RM ${payment.splitAmount.toStringAsFixed(2)} • ${confirmed ? 'Paid' : 'Pending'} • ${_verificationLabel(verificationStatus)}'),
                           ),
                         );
                       },
                     );
                   }),
-                  if ((payment.passengerDues[currentUid] ?? 0) > 0 && !payment.confirmedBy.contains(currentUid))
+                  if (!isPayee && !payment.confirmedBy.contains(currentUid))
                     FilledButton(
                       onPressed: () => context.read<PaymentProvider>().confirmPayment(payment.id, currentUid),
                       child: const Text('I\'ve Paid'),

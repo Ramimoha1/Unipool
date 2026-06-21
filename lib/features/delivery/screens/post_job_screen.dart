@@ -162,6 +162,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           {
             'name': _itemNameController.text.trim(),
             'description': '',
+            // ignore: use_null_aware_elements
             if (photoUrl != null) 'photo_url': photoUrl,
           }
         ],
@@ -175,11 +176,12 @@ class _PostJobScreenState extends State<PostJobScreen> {
         updatedAt: now,
       );
 
+      if (!mounted) return;
       final id =
           await context.read<DeliveryProvider>().createJob(job);
 
-      if (mounted && id != null) {
-        if (!mounted) return;
+      if (!mounted) return;
+      if (id != null) {
         final created = job.copyWith(id: id);
         Navigator.pushReplacement(
           context,
@@ -379,7 +381,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
                     title: const Text('Verified drivers only',
                         style: TextStyle(fontSize: 14)),
                     value: DeliveryAllowedDrivers.verifiedOnly,
+                    // ignore: deprecated_member_use
                     groupValue: _allowedDrivers,
+                    // ignore: deprecated_member_use
                     onChanged: (v) =>
                         setState(() => _allowedDrivers = v!),
                   ),
@@ -390,7 +394,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
                     title: const Text('Any driver',
                         style: TextStyle(fontSize: 14)),
                     value: DeliveryAllowedDrivers.verifiedAndUnverified,
+                    // ignore: deprecated_member_use
                     groupValue: _allowedDrivers,
+                    // ignore: deprecated_member_use
                     onChanged: (v) =>
                         setState(() => _allowedDrivers = v!),
                   ),

@@ -19,7 +19,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:typed_data';
+
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _kPurple = Color(0xFF7C3AED);
@@ -408,7 +408,7 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEF2F2),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFDC2626).withOpacity(0.25)),
+                    border: Border.all(color: const Color(0xFFDC2626).withValues(alpha: 0.25)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,

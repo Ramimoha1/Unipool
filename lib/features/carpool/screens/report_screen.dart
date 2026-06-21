@@ -22,7 +22,7 @@ class _ReportScreenState extends State<ReportScreen> {
   final _descriptionController = TextEditingController();
   String? _targetUserId;
   String _reason = CarpoolReportReasons.didNotPay;
-  List<XFile> _attachments = [];
+  final List<XFile> _attachments = [];
   bool _isSubmitting = false;
   Map<String, String> _userNames = {};
   bool _loadingNames = true;
@@ -94,7 +94,6 @@ class _ReportScreenState extends State<ReportScreen> {
       // 1. Upload attachments
       final List<String> attachmentUrls = [];
       for (final file in _attachments) {
-        final ext = file.name.split('.').last.toLowerCase();
         final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
         final storageRef = FirebaseStorage.instance.ref().child('ride_reports_attachments/$reportId/$fileName');
         

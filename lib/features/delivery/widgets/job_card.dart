@@ -27,8 +27,6 @@ class JobCard extends StatelessWidget {
     final startFormat = DateFormat('h:mm a').format(job.timeWindowStart);
     final endFormat = DateFormat('h:mm a').format(job.timeWindowEnd);
 
-    // Initial for avatar
-    final initial = job.sellerId.isNotEmpty ? job.sellerId[0].toUpperCase() : '?';
 
     return Container(
       decoration: BoxDecoration(
@@ -36,7 +34,7 @@ class JobCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -164,7 +162,7 @@ class JobCard extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 12,
-                          backgroundColor: _purple.withOpacity(0.1),
+                          backgroundColor: _purple.withValues(alpha: 0.1),
                           child: Text(
                             initial,
                             style: const TextStyle(

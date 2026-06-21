@@ -16,7 +16,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   // ─── Constants ───────────────────────────────────────────────────────────
   static const Color _teal = Color(0xFF1A9B8A);
-  static const Color _border = Color(0xFFE5EAF0);
+
   static const Color _textDark = Color(0xFF1A2332);
   static const Color _textMuted = Color(0xFF9CA3AF);
   static const Color _errorRed = Color(0xFFDC2626);
@@ -280,7 +280,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _teal,
-                      disabledBackgroundColor: _teal.withOpacity(0.6),
+                      disabledBackgroundColor: _teal.withValues(alpha: 0.6),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

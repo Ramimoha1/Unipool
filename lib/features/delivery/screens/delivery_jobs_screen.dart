@@ -222,7 +222,7 @@ class _JobCard extends StatelessWidget {
     final timeText =
         '${DateFormat('h:mm a').format(job.timeWindowStart)} – '
         '${DateFormat('h:mm a').format(job.timeWindowEnd)}';
-    final initials = _initials(job.sellerId);
+
 
     return GestureDetector(
       onTap: onTap,
@@ -378,10 +378,7 @@ class _JobCard extends StatelessWidget {
     );
   }
 
-  String _initials(String uid) {
-    if (uid.isEmpty) return '?';
-    return uid.substring(0, 1).toUpperCase();
-  }
+
 }
 
 // ─── Price Badge ──────────────────────────────────────────────────────────────

@@ -133,12 +133,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(Icons.logout, color: Colors.white),
           onPressed: () async {
             await FirebaseAuth.instance.signOut();
-            if (context.mounted) {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const AuthGate()),
-                (route) => false,
-              );
-            }
+            if (!mounted) return;
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const AuthGate()),
+              (route) => false,
+            );
           },
         ),
       ],

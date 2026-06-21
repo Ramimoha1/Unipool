@@ -131,7 +131,7 @@ class _DeliveryDisputeScreenState extends State<DeliveryDisputeScreen> {
                 decoration: BoxDecoration(
                   color: _kRedBg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _kRed.withOpacity(0.2)),
+                  border: Border.all(color: _kRed.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,7 +146,7 @@ class _DeliveryDisputeScreenState extends State<DeliveryDisputeScreen> {
                         'stay open.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: _kRed.withOpacity(0.9),
+                          color: _kRed.withValues(alpha: 0.9),
                           height: 1.4,
                         ),
                       ),

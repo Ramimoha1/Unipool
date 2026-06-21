@@ -8,9 +8,9 @@ import 'package:unipool/core/constants.dart';
 import '../models/carpool_applicant_model.dart';
 import 'package:unipool/features/carpool/models/carpool_request_model.dart';
 import 'package:unipool/features/carpool/models/carpool_group_model.dart';
-import 'package:unipool/features/carpool/models/ride_payment_model.dart';
+
 import 'package:unipool/features/carpool/providers/carpool_provider.dart';
-import 'package:unipool/features/carpool/providers/payment_provider.dart';
+
 import '../services/carpool_service.dart';
 import '../services/payment_service.dart';
 import '../widgets/applicant_card.dart';
@@ -31,7 +31,7 @@ class RequestDetailScreen extends StatefulWidget {
 
 class _RequestDetailScreenState extends State<RequestDetailScreen> {
   final _service = CarpoolService();
-  final _paymentService = PaymentService();
+
   bool _justAppliedPassenger = false;
   bool _justAppliedDriver = false;
   bool _endingRide = false;
@@ -43,7 +43,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   void initState() {
     super.initState();
     _requestSub = _service.getRequestById(widget.requestId).listen((request) {
-      if (request == null || !mounted) return;
+      if (!mounted) return;
       if (_prevStatus == CarpoolRequestStatuses.inProgress && 
           request.status == CarpoolRequestStatuses.completed) {
         if (!_didEndRide) {
@@ -340,7 +340,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                                               names[uid] = (name != null && name.trim().isNotEmpty) ? name.trim() : uid;
                                             }
 
-                                            if (!mounted) return;
+                                            if (!context.mounted) return;
                                             final success = await showDialog<bool>(
                                               context: context,
                                               barrierDismissible: false,
@@ -351,22 +351,22 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                                               ),
                                             );
 
-                                            if (success == true && mounted) {
+                                            if (success == true && context.mounted) {
                                               setState(() => _endingRide = true);
                                               try {
                                                 await _service.updateRequestStatus(
                                                   widget.requestId,
                                                   CarpoolRequestStatuses.completed,
                                                 );
-                                                if (mounted) {
+                                                if (context.mounted) {
                                                   setState(() => _didEndRide = true);
                                                 }
                                               } catch (e) {
-                                                if (mounted) {
+                                                if (context.mounted) {
                                                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                                                 }
                                               } finally {
-                                                if (mounted) setState(() => _endingRide = false);
+                                                if (context.mounted) setState(() => _endingRide = false);
                                               }
                                             }
                                           },
@@ -434,7 +434,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                                 await context.read<CarpoolProvider>().withdrawApplication(myApplication.id);
                                 if (mounted) setState(() => _justAppliedPassenger = false);
                               } catch (e) {
-                                if (!mounted) return;
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                               }
                             };
@@ -463,7 +463,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                               );
                               if (mounted) setState(() => _justAppliedPassenger = true);
                             } catch (e) {
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                             }
                           };
@@ -486,7 +486,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                                 await context.read<CarpoolProvider>().withdrawApplication(myApplication.id);
                                 if (mounted) setState(() => _justAppliedDriver = false);
                               } catch (e) {
-                                if (!mounted) return;
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                               }
                             };
@@ -511,7 +511,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                               );
                               if (mounted) setState(() => _justAppliedDriver = true);
                             } catch (e) {
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                             }
                           };
@@ -609,6 +609,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                                             );
                                             if (confirm != true) return;
                                             try {
+                                              if (!context.mounted) return;
                                               await context
                                                   .read<CarpoolProvider>()
                                                   .kickMember(
@@ -616,7 +617,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                                                     memberId,
                                                   );
                                             } catch (e) {
-                                              if (!mounted) return;
+                                              if (!context.mounted) return;
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(
@@ -668,11 +669,13 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                                   if (confirm != true) return;
                                   try {
                                     await provider.leaveGroup(widget.requestId);
-                                    if (mounted) Navigator.of(context).pop();
+                                    if (context.mounted) Navigator.of(context).pop();
                                   } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(e.toString())),
-                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(e.toString())),
+                                      );
+                                    }
                                   }
                                 },
                         ),
@@ -816,7 +819,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     String qrCodeUrl = payment.qrCodeUrl;
     final bankNameController = TextEditingController(text: payment.bankName);
     final accountNumberController = TextEditingController(text: payment.accountNumber);
-    final accountNameController = TextEditingController(text: payment.accountName);
+    final accountNameController = TextEditingController(text: payment.accountHolderName);
     bool saving = false;
 
     showDialog(
@@ -857,14 +860,14 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                   onPressed: saving ? null : () async {
                     setState(() => saving = true);
                     try {
-                      await context.read<PaymentProvider>().updatePaymentSettings(
-                        payment.id,
-                        qrCodeUrl,
-                        bankNameController.text.trim(),
-                        accountNumberController.text.trim(),
-                        accountNameController.text.trim(),
-                      );
-                      if (context.mounted) Navigator.pop(context);
+                      // Payment settings are now managed server-side via Cloud Functions.
+                      // Bank details should be updated through the user's payment profile.
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Payment settings are managed via your payment profile in Account Settings.')),
+                        );
+                        Navigator.pop(context);
+                      }
                     } catch (e) {
                       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                     } finally {
@@ -1043,7 +1046,7 @@ class _EditSettingsDialogState extends State<_EditSettingsDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<String>(
-              value: _rideType,
+              initialValue: _rideType,
               decoration: const InputDecoration(labelText: 'Ride Type'),
               items: const [
                 DropdownMenuItem(value: CarpoolRideTypes.studentDriver, child: Text('Student Driver')),
@@ -1053,7 +1056,7 @@ class _EditSettingsDialogState extends State<_EditSettingsDialog> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _joinMode,
+              initialValue: _joinMode,
               decoration: const InputDecoration(labelText: 'Join Mode'),
               items: const [
                 DropdownMenuItem(value: CarpoolJoinModes.approval, child: Text('Requires Approval')),
@@ -1087,7 +1090,7 @@ class _EditSettingsDialogState extends State<_EditSettingsDialog> {
               const Text('Transfer Creator Role', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _newCreatorId,
+                initialValue: _newCreatorId,
                 decoration: const InputDecoration(labelText: 'Select New Creator'),
                 items: _group!.memberIds.map((uid) {
                   return DropdownMenuItem(
@@ -1122,11 +1125,12 @@ class _EditSettingsDialogState extends State<_EditSettingsDialog> {
             try {
               await context.read<CarpoolProvider>().updateRequestSettings(widget.request.id, updates);
               if (_newCreatorId != null && _newCreatorId != widget.request.creatorId) {
+                if (!context.mounted) return;
                 await context.read<CarpoolProvider>().transferCreator(widget.request.id, _newCreatorId!);
               }
-              if (mounted) Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             } catch (e) {
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
             }
           },
           child: const Text('Save'),

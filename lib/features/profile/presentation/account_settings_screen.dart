@@ -23,9 +23,7 @@ class AccountSettingsScreen extends StatefulWidget {
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   // ─── Constants ───────────────────────────────────────────────────────────
   static const Color _teal = Color(0xFF1A9B8A);
-  static const Color _tealLight = Color(0xFFE8F7F5);
   static const Color _red = Color(0xFFE53935);
-  static const Color _redLight = Color(0xFFFFEBEE);
   static const Color _textDark = Color(0xFF1A2332);
   static const Color _textMuted = Color(0xFF8A96A3);
   static const Color _border = Color(0xFFE5EAF0);
@@ -431,6 +429,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
     // Require re-auth for account deletion
     final passwordCtrl = TextEditingController();
+    if (!mounted) return;
     final reauthed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -811,7 +810,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   child: Text(
                     'UniPool v0.1.0',
                     style: TextStyle(
-                      color: _textMuted.withOpacity(0.6),
+                      color: _textMuted.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -935,7 +934,7 @@ class _SectionCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -993,7 +992,7 @@ class _SettingsTile extends StatelessWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
+                    color: iconColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(icon, color: iconColor, size: 17),
@@ -1073,7 +1072,7 @@ class _ToggleTile extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
+                  color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(icon, color: iconColor, size: 17),
@@ -1104,7 +1103,7 @@ class _ToggleTile extends StatelessWidget {
               Switch.adaptive(
                 value: value,
                 onChanged: onChanged,
-                activeColor: _teal,
+                activeTrackColor: _teal,
               ),
             ],
           ),
