@@ -1,3 +1,4 @@
+
 class AppCollections {
   static const users = 'users';
   static const carpoolRequests = 'carpool_requests';
@@ -9,6 +10,11 @@ class AppCollections {
   // Delivery
   static const deliveryJobs = 'delivery_jobs';
   static const deliveryDisputes = 'delivery_disputes';
+  static const deliveryPayments = 'delivery_payments';
+
+  // Bank/QR payment details — owner-locked, separate from users/{uid}.
+  // See bank_details_repository.dart and firestore.rules.
+  static const bankDetails = 'bank_details';
 }
 
 class AppFields {
@@ -74,6 +80,7 @@ class AppFields {
   static const splitAmount = 'split_amount';
   static const paymentStatus = 'status';
   static const confirmedBy = 'confirmed_by';
+  static const payeeBankSnapshot = 'payee_bank_snapshot';
 
   // Bank details fields (nested map on user doc)
   static const bankDetails = 'bankDetails';
@@ -171,6 +178,7 @@ class CarpoolReportStatuses {
 
 class FirebaseFunctionNames {
   static const sendFcmNotification = 'sendFCMNotification';
+  static const copyPayeeBankDetails = 'copyPayeeBankDetails';
 }
 
 class CarpoolJoinModes {
@@ -220,3 +228,4 @@ class ChatMessageTypes {
   static const text = 'text';
   static const image = 'image';
 }
+

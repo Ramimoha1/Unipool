@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendFCMNotification = exports.onRideCompleted = exports.onApplicantAccepted = void 0;
+exports.copyPayeeBankDetails = exports.sendFCMNotification = exports.onRideCompleted = exports.onApplicantAccepted = void 0;
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
@@ -87,4 +87,42 @@ exports.sendFCMNotification = (0, https_1.onCall)(async (request) => {
     }
     await sendPushToUser(userId, title, body);
     return { success: true };
+});
+// Copies a payee's bank/QR details onto a payment document, server-side.
+// This is the ONLY place that reads another user's bank_details doc — it
+// runs with admin privileges and bypasses Firestore rules by design. The
+// client never reads bank_details/{otherUid} directly; it calls this
+// function instead, right after creating a payment document.
+const ALLOWED_PAYMENT_COLLECTIONS = ['ride_payments', 'delivery_payments'];
+exports.copyPayeeBankDetails = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Authentication required.');
+    }
+    const payeeId = request.data?.payeeId;
+    const paymentCollection = request.data?.paymentCollection;
+    const paymentId = request.data?.paymentId;
+    if (!payeeId || !paymentCollection || !paymentId) {
+        throw new https_1.HttpsError('invalid-argument', 'payeeId, paymentCollection, and paymentId are required.');
+    }
+    if (!ALLOWED_PAYMENT_COLLECTIONS.includes(paymentCollection)) {
+        throw new https_1.HttpsError('invalid-argument', 'Unknown payment collection.');
+    }
+    const paymentRef = db.collection(paymentCollection).doc(paymentId);
+    const paymentSnap = await paymentRef.get();
+    if (!paymentSnap.exists) {
+        throw new https_1.HttpsError('not-found', 'Payment document not found.');
+    }
+    const bankDoc = await db.collection('bank_details').doc(payeeId).get();
+    const bankData = bankDoc.exists ? bankDoc.data() : null;
+    await paymentRef.update({
+        payee_bank_snapshot: bankData
+            ? {
+                bankName: bankData.bankName ?? '',
+                accountHolderName: bankData.accountHolderName ?? '',
+                accountNumber: bankData.accountNumber ?? '',
+                qrCodeUrl: bankData.qrCodeUrl ?? '',
+            }
+            : null,
+    });
+    return { success: true, hasBankDetails: bankData !== null };
 });

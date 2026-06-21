@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:unipool/core/constants.dart';
 import '../models/ride_payment_model.dart';
@@ -9,13 +10,16 @@ class PaymentService {
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
     NotificationService? notificationService,
+    FirebaseFunctions? functions,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
-       _notificationService = notificationService ?? NotificationService();
+       _notificationService = notificationService ?? NotificationService(),
+       _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final NotificationService _notificationService;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> get _requests =>
       _firestore.collection(AppCollections.carpoolRequests);
@@ -61,34 +65,12 @@ class PaymentService {
           ? group[AppFields.driverId] as String
           : requestData[AppFields.creatorId] as String;
 
-      final userDoc = await _firestore
-          .collection(AppCollections.users)
-          .doc(bookedByUserId)
-          .get();
-      final userData = userDoc.data();
-      var qrCodeUrl =
-          (userData?[AppFields.userQrCodeUrl] as String?) ??
-          (userData?[AppFields.userQrCodeUrlSnake] as String?) ??
-          '';
-      if (qrCodeUrl.isEmpty &&
-          bookedByUserId != requestData[AppFields.creatorId]) {
-        final creatorDoc = await _firestore
-            .collection(AppCollections.users)
-            .doc(requestData[AppFields.creatorId])
-            .get();
-        final creatorData = creatorDoc.data();
-        qrCodeUrl =
-            (creatorData?[AppFields.userQrCodeUrl] as String?) ??
-            (creatorData?[AppFields.userQrCodeUrlSnake] as String?) ??
-            '';
-      }
-
       final paymentRef = _payments.doc();
       final payment = RidePaymentModel(
         id: paymentRef.id,
         requestId: requestId,
         bookedByUserId: bookedByUserId,
-        qrCodeUrl: qrCodeUrl,
+        qrCodeUrl: '', // filled in below by copyPayeeBankDetails
         totalAmount: 0,
         splitAmount: 0,
         status: CarpoolPaymentStatuses.pending,
@@ -96,6 +78,18 @@ class PaymentService {
         createdAt: DateTime.now(),
       );
       await paymentRef.set(payment.toMap());
+
+      // Bank details / QR are owner-locked in their own collection now
+      // (see bank_details_repository.dart). The client never reads
+      // another user's bank details directly — this Cloud Function
+      // does it server-side and copies a snapshot onto the payment doc.
+      await _functions
+          .httpsCallable(FirebaseFunctionNames.copyPayeeBankDetails)
+          .call(<String, dynamic>{
+            'payeeId': bookedByUserId,
+            'paymentCollection': AppCollections.ridePayments,
+            'paymentId': paymentRef.id,
+          });
 
       for (final memberId in members) {
         await _notificationService.sendFCMToUser(

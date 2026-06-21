@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -30,6 +31,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
+    }
+
+    // Bank/QR payment details. Owner-only — never read directly by other
+    // users. Payers see a snapshot copied onto the payment doc instead
+    // (see ride_payments / delivery_payments + the copyPayeeBankDetails
+    // Cloud Function).
+    match /bank_details/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
 
     match /driverApplications/{applicationId} {
@@ -127,3 +136,4 @@ service cloud.firestore {
     }
   }
 }
+
