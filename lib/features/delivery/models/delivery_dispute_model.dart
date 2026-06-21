@@ -7,6 +7,7 @@ class DeliveryDisputeModel {
     required this.jobId,
     required this.sellerId,
     required this.driverId,
+    required this.filedBy,
     required this.reason,
     required this.description,
     required this.evidenceUrls,
@@ -20,6 +21,11 @@ class DeliveryDisputeModel {
   final String jobId;
   final String sellerId;
   final String driverId;
+
+  // uid of whichever party filed this — either sellerId or driverId.
+  // Lets the UI show "you reported this" vs "they reported you".
+  final String filedBy;
+
   final String reason;
   final String description;
   final List<String> evidenceUrls;
@@ -34,6 +40,7 @@ class DeliveryDisputeModel {
       jobId: map[AppFields.jobId] as String? ?? '',
       sellerId: map[AppFields.sellerId] as String? ?? '',
       driverId: map[AppFields.driverId] as String? ?? '',
+      filedBy: map[AppFields.filedBy] as String? ?? '',
       reason: map[AppFields.reason] as String? ?? '',
       description: map[AppFields.description] as String? ?? '',
       evidenceUrls:
@@ -55,6 +62,7 @@ class DeliveryDisputeModel {
       AppFields.jobId: jobId,
       AppFields.sellerId: sellerId,
       AppFields.driverId: driverId,
+      AppFields.filedBy: filedBy,
       AppFields.reason: reason,
       AppFields.description: description,
       AppFields.evidenceUrls: evidenceUrls,
@@ -70,6 +78,7 @@ class DeliveryDisputeModel {
     String? jobId,
     String? sellerId,
     String? driverId,
+    String? filedBy,
     String? reason,
     String? description,
     List<String>? evidenceUrls,
@@ -83,6 +92,7 @@ class DeliveryDisputeModel {
       jobId: jobId ?? this.jobId,
       sellerId: sellerId ?? this.sellerId,
       driverId: driverId ?? this.driverId,
+      filedBy: filedBy ?? this.filedBy,
       reason: reason ?? this.reason,
       description: description ?? this.description,
       evidenceUrls: evidenceUrls ?? this.evidenceUrls,

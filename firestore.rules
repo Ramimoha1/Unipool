@@ -111,7 +111,23 @@ service cloud.firestore {
     }
 
     match /delivery_jobs/{jobId} {
-      allow read, create, update: if isSignedIn();
+      // Anyone signed in can browse/read open jobs. Writes are scoped to
+      // the seller (job owner) or the assigned driver — not "anyone".
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.seller_id == request.auth.uid;
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.seller_id == request.auth.uid ||
+        resource.data.assigned_driver_id == request.auth.uid
+      ) &&
+        // Job cannot be marked completed while a dispute is open — this
+        // mirrors the check in delivery_service.dart's completeJob(), but
+        // THIS is the one that's actually enforced; the client-side check
+        // is just a nicer error message before the request round-trips.
+        !(
+          request.resource.data.job_status == 'completed' &&
+          resource.data.job_status == 'disputed'
+        );
       allow delete: if isAdmin() || resource.data.seller_id == request.auth.uid;
 
       match /applications/{applicationId} {
@@ -131,7 +147,18 @@ service cloud.firestore {
     }
 
     match /delivery_disputes/{disputeId} {
-      allow read, create, update: if isSignedIn();
+      // Either party to the job can read disputes on it, and either can
+      // file one (create). Only an admin can move it to resolved.
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.seller_id == request.auth.uid ||
+        resource.data.driver_id == request.auth.uid
+      );
+      allow create: if isSignedIn() && (
+        request.resource.data.seller_id == request.auth.uid ||
+        request.resource.data.driver_id == request.auth.uid
+      ) && request.resource.data.filed_by == request.auth.uid;
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
   }

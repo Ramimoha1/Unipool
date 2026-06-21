@@ -14,6 +14,7 @@ import '../services/delivery_service.dart';
 import '../services/delivery_proof_service.dart';
 import '../providers/delivery_proof_provider.dart';
 import '../models/delivery_proof_model.dart';
+import 'delivery_dispute_screen.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -51,6 +52,39 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
   bool _justApplied = false;
 
   bool get _isSeller => widget.job.sellerId == widget.currentUid;
+
+  // Disputes are only meaningful once a driver is actually attached to
+  // the job, and only while there isn't already an open one. Both seller
+  // and the assigned driver can file. Stages: driverAssigned through
+  // completed — not before (nothing to report yet) and not while already
+  // disputed (don't let people stack duplicate reports).
+  bool _canFileDispute(DeliveryJobModel job) {
+    final isAssignedDriver = job.assignedDriverId == widget.currentUid;
+    if (!_isSeller && !isAssignedDriver) return false;
+
+    const eligibleStages = {
+      DeliveryJobStatuses.driverAssigned,
+      DeliveryJobStatuses.inProgress,
+      DeliveryJobStatuses.proofPending,
+      DeliveryJobStatuses.awaitingPayment,
+      DeliveryJobStatuses.completed,
+    };
+    return eligibleStages.contains(job.jobStatus);
+  }
+
+  Future<void> _openDisputeScreen(
+    BuildContext context,
+    DeliveryJobModel job,
+  ) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DeliveryDisputeScreen(
+          job: job,
+          currentUid: widget.currentUid,
+        ),
+      ),
+    );
+  }
 
   Future<void> _applyToJob() async {
     setState(() => _applying = true);
@@ -110,6 +144,12 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                   icon: const Icon(Icons.people_outline),
                   tooltip: 'Applicants',
                   onPressed: () => _showApplicantsSheet(context, provider),
+                ),
+              if (_canFileDispute(job))
+                IconButton(
+                  icon: const Icon(Icons.flag_outlined),
+                  tooltip: 'Report an issue',
+                  onPressed: () => _openDisputeScreen(context, job),
                 ),
             ],
           ),
@@ -357,6 +397,53 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                       ),
                     );
                   },
+                ),
+              ],
+
+              // ── Disputed banner: shown to both seller and driver ──
+              if (job.jobStatus == DeliveryJobStatuses.disputed) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFDC2626).withOpacity(0.25)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.flag, color: Color(0xFFDC2626), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Job under dispute',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFDC2626),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'A report has been filed on this job. Payment '
+                              'and completion are paused until an admin '
+                              'reviews it. You can still chat and submit '
+                              'proof.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _kTextSecondary,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
 

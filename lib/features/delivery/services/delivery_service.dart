@@ -428,6 +428,13 @@ class DeliveryService {
       if ((data[AppFields.sellerId] as String?) != currentUid) {
         throw Exception('Only the seller can mark the job as completed.');
       }
+      if ((data[AppFields.jobStatus] as String?) ==
+          DeliveryJobStatuses.disputed) {
+        throw Exception(
+          'This job has an open dispute and cannot be marked completed '
+          'until it is resolved.',
+        );
+      }
 
       await _jobs.doc(jobId).update({
         AppFields.jobStatus: DeliveryJobStatuses.completed,
@@ -448,4 +455,3 @@ class DeliveryService {
     }
   }
 }
-
