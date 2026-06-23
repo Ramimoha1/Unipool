@@ -11,7 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:unipool/core/constants.dart';
 import '../models/carpool_request_model.dart';
 import '../providers/carpool_provider.dart';
-import '../providers/payment_provider.dart';
+
 import '../../profile/data/bank_details_repository.dart';
 import 'pick_location_screen.dart';
 import 'request_detail_screen.dart';
@@ -61,25 +61,31 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     if (uid == null) return;
     try {
       final details = await BankDetailsRepository().getBankDetails(uid);
-      if (details != null && details.isNotEmpty) {
+      if (details.isNotEmpty) {
         setState(() {
           _bankNameController.text = details.bankName;
           _accountNumberController.text = details.accountNumber;
           _accountNameController.text = details.accountHolderName;
           _qrCodeUrl = details.qrCodeUrl;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment profile loaded')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment profile loaded')),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No payment profile found. Configure it in settings.')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No payment profile found. Configure it in settings.')),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load profile: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load profile: $e')),
+        );
+      }
     }
   }
 
@@ -208,17 +214,8 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         isCreatorDriver: _rideType == CarpoolRideTypes.studentDriver && _isCreatorDriver,
       );
       if (createdId != null) {
-        if (_rideType == CarpoolRideTypes.grab || (_rideType == CarpoolRideTypes.studentDriver && _isCreatorDriver)) {
-          await context.read<PaymentProvider>().initializePayment(
-            createdId,
-            request.creatorId,
-            _qrCodeUrl ?? '',
-            _bankNameController.text.trim(),
-            _accountNumberController.text.trim(),
-            _accountNameController.text.trim(),
-          );
-        }
         if (mounted) {
+
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(

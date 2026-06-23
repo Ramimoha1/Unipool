@@ -354,12 +354,14 @@ class _MapScreenState extends State<MapScreen> {
   Set<Marker> _buildMarkers(List<CarpoolRequestModel> requests) {
     final markers = <Marker>{};
     for (final request in requests) {
-      final detailRoute = () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => RequestDetailScreen(requestId: request.id),
-        ),
-      );
+      void detailRoute() {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RequestDetailScreen(requestId: request.id),
+          ),
+        );
+      }
 
       markers.add(
         Marker(

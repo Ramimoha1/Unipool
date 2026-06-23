@@ -1,25 +1,25 @@
-import 'dart:io' as io;
+
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart';
+
+
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+
 import 'package:provider/provider.dart';
 import 'package:unipool/core/constants.dart';
 import '../models/carpool_request_model.dart';
 import '../models/carpool_group_model.dart';
 import '../models/chat_message_model.dart';
-import '../models/ride_payment_model.dart';
+
 import '../providers/chat_provider.dart';
 import '../services/carpool_service.dart';
 import '../services/chat_service.dart';
-import '../services/payment_service.dart';
+
 import '../widgets/message_bubble.dart';
 import '../widgets/payment_banner.dart';
 import '../widgets/ride_status_badge.dart';
-import 'payment_screen.dart';
+
 import 'report_screen.dart';
 
 class GroupChatScreen extends StatefulWidget {
@@ -39,7 +39,7 @@ class GroupChatScreen extends StatefulWidget {
 class _GroupChatScreenState extends State<GroupChatScreen> {
   final _messageController = TextEditingController();
   final _chatService = ChatService();
-  final _paymentService = PaymentService();
+
   final _carpoolService = CarpoolService();
 
   @override
@@ -126,12 +126,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           }
 
           final request = requestSnapshot.data!;
-          final isAdmin = request.creatorId == currentUid;
+
 
           return FutureBuilder<CarpoolGroupModel?>(
             future: _carpoolService.getGroupByRequestId(widget.requestId),
             builder: (context, groupSnapshot) {
-              final group = groupSnapshot.data;
+
 
               return Column(
                 children: [
@@ -229,9 +229,4 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 }
 
-class _RideQrInfo {
-  const _RideQrInfo({required this.bookedByUserId, required this.qrCodeUrl});
 
-  final String bookedByUserId;
-  final String qrCodeUrl;
-}

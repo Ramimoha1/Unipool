@@ -18,7 +18,6 @@ class PaymentHistoryScreen extends StatelessWidget {
           ? const Center(child: Text('Not logged in'))
           : FutureBuilder<List<RidePaymentModel>>(
               future: () async {
-                if (uid == null) return <RidePaymentModel>[];
                 final groupsSnapshot = await FirebaseFirestore.instance
                     .collection(AppCollections.carpoolGroups)
                     .where('member_ids', arrayContains: uid)
@@ -41,9 +40,8 @@ class PaymentHistoryScreen extends StatelessWidget {
                 }
                 
                 final myPayments = allPayments.where((p) {
-                  final isPayer = p.passengerDues.containsKey(uid) && p.passengerDues[uid]! > 0;
                   final isPayee = p.bookedByUserId == uid;
-                  return isPayer || isPayee;
+                  return isPayee || p.splitAmount > 0;
                 }).toList();
                 
                 myPayments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -70,8 +68,7 @@ class PaymentHistoryScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final payment = myPayments[index];
                     final isPayee = payment.bookedByUserId == uid;
-                    final due = payment.passengerDues[uid] ?? 0.0;
-                    final isPayer = due > 0;
+                    final due = payment.splitAmount;
                     final hasPaid = payment.confirmedBy.contains(uid);
 
                     String roleText = isPayee ? 'Receiving Payment' : 'Paying';

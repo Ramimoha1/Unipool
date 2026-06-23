@@ -118,10 +118,13 @@ class _MyDeliveryJobsScreenState extends State<MyDeliveryJobsScreen>
           'Post Job',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const PostJobScreen()),
-        ).then((_) => context.read<DeliveryProvider>().loadMyJobs()),
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PostJobScreen()),
+          );
+          if (context.mounted) context.read<DeliveryProvider>().loadMyJobs();
+        },
       ),
     );
   }
@@ -193,15 +196,18 @@ class _MyJobCard extends StatelessWidget {
     final (statusLabel, statusColor) = _statusInfo(job.jobStatus);
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => DeliveryJobDetailScreen(
-            job: job,
-            currentUid: currentUid,
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DeliveryJobDetailScreen(
+              job: job,
+              currentUid: currentUid,
+            ),
           ),
-        ),
-      ).then((_) => context.read<DeliveryProvider>().loadMyJobs()),
+        );
+        if (context.mounted) context.read<DeliveryProvider>().loadMyJobs();
+      },
       child: Container(
         decoration: BoxDecoration(
           color: _kCardBg,

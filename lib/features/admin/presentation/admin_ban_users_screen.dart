@@ -22,7 +22,7 @@ class AdminBanUsersScreen extends StatefulWidget {
 class _AdminBanUsersScreenState extends State<AdminBanUsersScreen>
     with SingleTickerProviderStateMixin {
   static const Color _purple = Color(0xFF7C3AED);
-  static const Color _red = Color(0xFFD32F2F);
+
   static const Color _bg = Color(0xFFF7F9FC);
 
   late final TabController _tabs;

@@ -541,7 +541,6 @@ class _VehicleTypeSelector extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onChanged;
 
-  static const Color _teal = Color(0xFF1A9B8A);
 
   @override
   Widget build(BuildContext context) {

@@ -4,7 +4,7 @@ import '../models/carpool_group_model.dart';
 import '../models/carpool_request_model.dart';
 import '../providers/payment_provider.dart';
 import '../services/payment_service.dart';
-import 'payment_screen.dart';
+
 
 class EndRideSplitDialog extends StatefulWidget {
   const EndRideSplitDialog({
@@ -48,38 +48,6 @@ class _EndRideSplitDialogState extends State<EndRideSplitDialog> {
     super.dispose();
   }
 
-  Map<String, double> _calculateDues() {
-    final total = double.tryParse(_totalFareController.text.trim()) ?? 0.0;
-    final dues = <String, double>{};
-    final memberIds = widget.group.memberIds;
-    final currentUserId = widget.request.creatorId; // Using creator as default skip, or driver
-
-    if (_splitType == 'manual') {
-      for (final uid in memberIds) {
-        dues[uid] = double.tryParse(_manualDuesControllers[uid]?.text.trim() ?? '') ?? 0.0;
-      }
-    } else if (_splitType == 'equally') {
-      if (memberIds.isEmpty) return dues;
-      final split = total / memberIds.length;
-      for (final uid in memberIds) {
-        dues[uid] = split;
-      }
-    } else {
-      // equally_without_me
-      final driverId = widget.group.driverId.isNotEmpty ? widget.group.driverId : widget.request.creatorId;
-      final payingMembers = memberIds.where((id) => id != driverId).toList();
-      if (payingMembers.isEmpty) {
-        for (final uid in memberIds) dues[uid] = 0.0;
-      } else {
-        final split = total / payingMembers.length;
-        for (final uid in memberIds) {
-          dues[uid] = payingMembers.contains(uid) ? split : 0.0;
-        }
-      }
-    }
-    return dues;
-  }
-
   Future<void> _submit() async {
     final total = double.tryParse(_totalFareController.text.trim());
     if (total == null || total <= 0) {
@@ -89,7 +57,6 @@ class _EndRideSplitDialogState extends State<EndRideSplitDialog> {
       return;
     }
 
-    final dues = _calculateDues();
     final paymentService = PaymentService();
     
     setState(() => _saving = true);
@@ -99,11 +66,9 @@ class _EndRideSplitDialogState extends State<EndRideSplitDialog> {
         throw Exception('Payment has not been initialized for this request.');
       }
       
+      if (!mounted) return;
       await context.read<PaymentProvider>().triggerPayment(
-        payment.id,
         widget.request.id,
-        total,
-        dues,
       );
 
       if (mounted) {
@@ -137,19 +102,25 @@ class _EndRideSplitDialogState extends State<EndRideSplitDialog> {
             RadioListTile<String>(
               title: const Text('Equally without me'),
               value: 'equally_without_me',
+              // ignore: deprecated_member_use
               groupValue: _splitType,
+              // ignore: deprecated_member_use
               onChanged: (val) => setState(() => _splitType = val!),
             ),
             RadioListTile<String>(
               title: const Text('Equally (everyone pays)'),
               value: 'equally',
+              // ignore: deprecated_member_use
               groupValue: _splitType,
+              // ignore: deprecated_member_use
               onChanged: (val) => setState(() => _splitType = val!),
             ),
             RadioListTile<String>(
               title: const Text('Manual'),
               value: 'manual',
+              // ignore: deprecated_member_use
               groupValue: _splitType,
+              // ignore: deprecated_member_use
               onChanged: (val) => setState(() => _splitType = val!),
             ),
             if (_splitType == 'manual') ...[
