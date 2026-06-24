@@ -15,7 +15,6 @@ import '../services/delivery_proof_service.dart';
 import '../providers/delivery_proof_provider.dart';
 import '../models/delivery_proof_model.dart';
 import 'delivery_dispute_screen.dart';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -876,23 +875,65 @@ class _SubmitProofDialogState extends State<_SubmitProofDialog> {
   bool _isSubmitting = false;
 
   Future<void> _takePhoto() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.camera);
-    if (picked != null) {
-      setState(() {
-        _pickedFile = picked;
-      });
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+      if (picked != null && mounted) {
+        setState(() {
+          _pickedFile = picked;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_friendlyPickerError(e, source: 'camera')),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _uploadPhoto() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        _pickedFile = picked;
-      });
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+      if (picked != null && mounted) {
+        setState(() {
+          _pickedFile = picked;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_friendlyPickerError(e, source: 'gallery')),
+          ),
+        );
+      }
     }
+  }
+
+  /// Turns a raw picker exception into something the user can act on,
+  /// instead of a generic "bugged out" white box with no feedback.
+  String _friendlyPickerError(Object e, {required String source}) {
+    final message = e.toString().toLowerCase();
+    if (message.contains('camera_access_denied') ||
+        message.contains('permission')) {
+      return source == 'camera'
+          ? 'Camera permission was denied. Enable it in your phone settings to take a photo.'
+          : 'Photo library permission was denied. Enable it in your phone settings to choose an image.';
+    }
+    if (message.contains('already_active')) {
+      return 'Picker is already open. Please wait and try again.';
+    }
+    return 'Could not open the $source. Please try again.';
   }
 
   Future<void> _submit() async {
@@ -921,12 +962,17 @@ class _SubmitProofDialogState extends State<_SubmitProofDialog> {
           .child(widget.jobId)
           .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-      if (kIsWeb) {
-        final bytes = await _pickedFile!.readAsBytes();
-        await storageRef.putData(bytes);
-      } else {
-        await storageRef.putFile(File(_pickedFile!.path));
-      }
+      // Read via XFile.readAsBytes() on every platform. Some Android
+      // gallery apps (Google Photos, OneDrive, etc.) hand back a
+      // content:// URI rather than a plain filesystem path, which
+      // File(path)/putFile cannot read — this caused uploads to fail
+      // silently. readAsBytes() goes through the platform channel and
+      // works for both normal paths and content:// URIs.
+      final bytes = await _pickedFile!.readAsBytes();
+      await storageRef.putData(
+        bytes,
+        SettableMetadata(contentType: _pickedFile!.mimeType ?? 'image/jpeg'),
+      );
       final photoUrl = await storageRef.getDownloadURL();
 
       final proof = DeliveryProofModel(
@@ -992,12 +1038,7 @@ class _SubmitProofDialogState extends State<_SubmitProofDialog> {
                         child: Icon(Icons.check_circle, color: _kPurple, size: 48),
                       ),
                     )
-                  : Image.file(
-                      File(_pickedFile!.path),
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
+                  : _ProofPreviewImage(file: _pickedFile!),
             ),
             const SizedBox(height: 8),
           ],
@@ -1048,6 +1089,70 @@ class _SubmitProofDialogState extends State<_SubmitProofDialog> {
               : const Text('Submit'),
         ),
       ],
+    );
+  }
+}
+
+/// Renders a picked image preview without relying on File(path), which
+/// fails silently (blank/white box) when the picker returns a content://
+/// URI instead of a plain filesystem path — a known mobile-only failure
+/// mode with image_picker on some Android devices and gallery apps.
+/// readAsBytes() reads through the platform channel and works for both.
+class _ProofPreviewImage extends StatefulWidget {
+  const _ProofPreviewImage({required this.file});
+
+  final XFile file;
+
+  @override
+  State<_ProofPreviewImage> createState() => _ProofPreviewImageState();
+}
+
+class _ProofPreviewImageState extends State<_ProofPreviewImage> {
+  late Future<Uint8List> _bytesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _bytesFuture = widget.file.readAsBytes();
+  }
+
+  @override
+  void didUpdateWidget(_ProofPreviewImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path) {
+      _bytesFuture = widget.file.readAsBytes();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uint8List>(
+      future: _bytesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SizedBox(
+            height: 120,
+            width: double.infinity,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Container(
+            height: 120,
+            width: double.infinity,
+            color: _kPurpleLight,
+            child: const Center(
+              child: Icon(Icons.broken_image_outlined, color: _kTextSecondary, size: 32),
+            ),
+          );
+        }
+        return Image.memory(
+          snapshot.data!,
+          height: 120,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        );
+      },
     );
   }
 }
