@@ -3,8 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'admin_driver_applications_screen.dart';
 import 'admin_ban_users_screen.dart';
-import 'admin_review_reports_screen.dart';
+import 'admin_resolve_disputes_screen.dart';
 import 'package:unipool/features/auth/presentation/auth_gate.dart';
+import 'package:unipool/core/constants.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -63,17 +64,10 @@ class AdminDashboardScreen extends StatelessWidget {
                     icon: Icons.warning_amber_outlined,
                     iconColor: const Color(0xFFF59E0B),
                     label: 'Resolve Disputes',
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 10),
-                  _QuickAction(
-                    icon: Icons.flag_outlined,
-                    iconColor: const Color(0xFF2563EB),
-                    label: 'Review Reports',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => const AdminReviewReportsScreen()),
+                          builder: (_) => const AdminResolveDisputesScreen()),
                     ),
                     isLast: true,
                   ),
@@ -175,24 +169,91 @@ class _StatsSection extends StatelessWidget {
           filterValue: true,
         ),
         const SizedBox(height: 12),
-        _StatCard(
+        const _DisputesStatCard(
           icon: Icons.warning_amber_outlined,
-          iconColor: const Color(0xFFF59E0B),
+          iconColor: Color(0xFFF59E0B),
           label: 'Open Disputes',
-          collection: 'disputes',
-          filterField: 'status',
-          filterValue: 'open',
-        ),
-        const SizedBox(height: 12),
-        _StatCard(
-          icon: Icons.flag_outlined,
-          iconColor: const Color(0xFF2563EB),
-          label: 'Recent Reports',
-          collection: 'reports',
-          filterField: 'reviewed',
-          filterValue: false,
         ),
       ],
+    );
+  }
+}
+
+class _DisputesStatCard extends StatelessWidget {
+  const _DisputesStatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection(AppCollections.rideReports)
+          .where(AppFields.status, isEqualTo: CarpoolReportStatuses.open)
+          .snapshots(),
+      builder: (context, rideSnap) {
+        final rideCount = rideSnap.data?.docs.length ?? 0;
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection(AppCollections.deliveryDisputes)
+              .where(AppFields.status, isEqualTo: DeliveryDisputeStatuses.open)
+              .snapshots(),
+          builder: (context, deliverySnap) {
+            final deliveryCount = deliverySnap.data?.docs.length ?? 0;
+            final count = rideCount + deliveryCount;
+            return Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border(left: BorderSide(color: iconColor, width: 4)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: iconColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 20),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label,
+                            style: const TextStyle(
+                                fontSize: 13, color: Color(0xFF6B7280))),
+                        Text('$count',
+                            style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A2332))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
