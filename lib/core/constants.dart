@@ -85,6 +85,10 @@ class AppFields {
   static const paymentStatus = 'status';
   static const confirmedBy = 'confirmed_by';
   static const payeeBankSnapshot = 'payee_bank_snapshot';
+  static const paymentProofUrl = 'payment_proof_url';
+  static const paymentProofMimeType = 'payment_proof_mime_type';
+  static const paidAt = 'paid_at';
+  static const driverConfirmedAt = 'driver_confirmed_at';
 
   // Bank details fields (nested map on user doc)
   static const bankDetails = 'bankDetails';
@@ -227,6 +231,11 @@ class DeliveryDisputeStatuses {
   static const open = 'open';
   static const underReview = 'under_review';
   static const resolved = 'resolved';
+}
+
+class DeliveryPaymentStatuses {
+  static const pending = 'pending';
+  static const settled = 'settled';
 }
 
 // Reasons a SELLER can report a DRIVER for.

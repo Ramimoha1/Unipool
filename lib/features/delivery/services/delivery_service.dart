@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:unipool/core/constants.dart';
 import 'package:unipool/features/carpool/services/notification_service.dart';
+import 'package:unipool/features/profile/domain/bank_details_model.dart';
 import '../models/delivery_application_model.dart';
 import '../models/delivery_job_model.dart';
 
@@ -130,8 +131,15 @@ class DeliveryService {
     String jobId,
     String driverId, {
     String notes = '',
+    required BankDetailsModel paymentDetails,
   }) async {
     try {
+      if (paymentDetails.isEmpty) {
+        throw Exception(
+          'Please provide payment details or use your saved payment settings.',
+        );
+      }
+
       await _checkBanStatus(driverId);
       final jobDoc = await _jobs.doc(jobId).get();
       if (!jobDoc.exists) {
@@ -152,10 +160,11 @@ class DeliveryService {
       if (existing.docs.isNotEmpty) {
         final existingDoc = existing.docs.first;
         if (existingDoc.data()[AppFields.status] == DeliveryApplicationStatuses.rejected) {
-          // Re-apply by updating the existing application to pending
           await existingDoc.reference.update({
             AppFields.status: DeliveryApplicationStatuses.pending,
             AppFields.createdAt: Timestamp.now(),
+            AppFields.updatedAt: Timestamp.now(),
+            AppFields.payeeBankSnapshot: paymentDetails.toMap(),
           });
           return;
         }
@@ -191,6 +200,7 @@ class DeliveryService {
         driverId: driverId,
         status: DeliveryApplicationStatuses.pending,
         notes: notes,
+        paymentDetails: paymentDetails,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -430,7 +440,7 @@ class DeliveryService {
   }
 
   /// Transitions the job status to `completed`.
-  /// Validates that the caller is the seller.
+  /// Validates that the caller is the assigned driver and payment is confirmed.
   Future<void> completeJob(String jobId) async {
     try {
       final currentUid = _auth.currentUser!.uid;
@@ -439,14 +449,48 @@ class DeliveryService {
         throw Exception('Delivery job not found.');
       }
       final data = jobDoc.data()!;
-      if ((data[AppFields.sellerId] as String?) != currentUid) {
-        throw Exception('Only the seller can mark the job as completed.');
+      if ((data[AppFields.assignedDriverId] as String?) != currentUid) {
+        throw Exception('Only the assigned driver can complete this job.');
       }
       if ((data[AppFields.jobStatus] as String?) ==
           DeliveryJobStatuses.disputed) {
         throw Exception(
-          'This job has an open dispute and cannot be marked completed '
+          'This job has an open dispute and cannot be completed '
           'until it is resolved.',
+        );
+      }
+      if ((data[AppFields.jobStatus] as String?) !=
+          DeliveryJobStatuses.awaitingPayment) {
+        throw Exception(
+          'This job can only be completed after payment is awaiting.',
+        );
+      }
+
+      final paymentSnap = await _firestore
+          .collection(AppCollections.deliveryPayments)
+          .where(AppFields.jobId, isEqualTo: jobId)
+          .limit(1)
+          .get();
+      if (paymentSnap.docs.isEmpty) {
+        throw Exception('Payment record not found.');
+      }
+
+      final paymentData = paymentSnap.docs.first.data();
+      final proofUrl =
+          paymentData[AppFields.paymentProofUrl] as String? ?? '';
+      final status =
+          paymentData[AppFields.paymentStatus] as String? ?? '';
+      final driverConfirmed =
+          paymentData[AppFields.driverConfirmedAt] != null;
+
+      if (status != DeliveryPaymentStatuses.settled || proofUrl.isEmpty) {
+        throw Exception(
+          'Wait until the seller has submitted payment proof.',
+        );
+      }
+      if (!driverConfirmed) {
+        throw Exception(
+          'Confirm that you received payment before completing the job.',
         );
       }
 
@@ -455,13 +499,12 @@ class DeliveryService {
         AppFields.updatedAt: Timestamp.now(),
       });
 
-      // Notify the driver
-      final driverId = data[AppFields.assignedDriverId] as String? ?? '';
-      if (driverId.isNotEmpty) {
+      final sellerId = data[AppFields.sellerId] as String? ?? '';
+      if (sellerId.isNotEmpty) {
         await _notificationService.sendFCMToUser(
-          driverId,
+          sellerId,
           'Delivery Completed',
-          'The seller has marked your delivery job as completed.',
+          'The driver has completed the delivery job.',
         );
       }
     } catch (error) {

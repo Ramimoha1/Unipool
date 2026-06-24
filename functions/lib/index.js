@@ -113,7 +113,22 @@ exports.copyPayeeBankDetails = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('not-found', 'Payment document not found.');
     }
     const bankDoc = await db.collection('bank_details').doc(payeeId).get();
-    const bankData = bankDoc.exists ? bankDoc.data() : null;
+    let bankData = bankDoc.exists ? bankDoc.data() : null;
+    if (!bankData) {
+        const userDoc = await db.collection('users').doc(payeeId).get();
+        const userData = userDoc.data();
+        const legacyBankDetails = userData === null || userData === void 0 ? void 0 : userData.bankDetails;
+        if (legacyBankDetails) {
+            bankData = legacyBankDetails;
+        }
+        else {
+            const legacyQr = (userData === null || userData === void 0 ? void 0 : userData.qr_code_url) ??
+                (userData === null || userData === void 0 ? void 0 : userData.qrCodeUrl);
+            if (legacyQr) {
+                bankData = { qrCodeUrl: legacyQr };
+            }
+        }
+    }
     await paymentRef.update({
         payee_bank_snapshot: bankData
             ? {

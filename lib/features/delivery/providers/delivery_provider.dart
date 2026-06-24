@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/delivery_application_model.dart';
 import '../models/delivery_job_model.dart';
+import 'package:unipool/features/profile/domain/bank_details_model.dart';
 import '../services/delivery_service.dart';
 
 class DeliveryProvider extends ChangeNotifier {
@@ -87,12 +88,18 @@ class DeliveryProvider extends ChangeNotifier {
     String jobId,
     String driverId, {
     String notes = '',
+    required BankDetailsModel paymentDetails,
   }) async {
     isLoading = true;
     error = null;
     notifyListeners();
     try {
-      await _service.applyToJob(jobId, driverId, notes: notes);
+      await _service.applyToJob(
+        jobId,
+        driverId,
+        notes: notes,
+        paymentDetails: paymentDetails,
+      );
     } catch (exception) {
       error = exception.toString();
       rethrow;

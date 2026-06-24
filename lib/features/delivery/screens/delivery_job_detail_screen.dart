@@ -11,10 +11,14 @@ import '../models/delivery_job_model.dart';
 import '../providers/delivery_provider.dart';
 import 'delivery_chat_screen.dart';
 import '../services/delivery_service.dart';
+import '../services/delivery_payment_service.dart';
+import '../models/delivery_payment_model.dart';
 import '../services/delivery_proof_service.dart';
 import '../providers/delivery_proof_provider.dart';
 import '../models/delivery_proof_model.dart';
 import 'delivery_dispute_screen.dart';
+import 'delivery_payment_screen.dart';
+import '../widgets/delivery_apply_payment_sheet.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -48,6 +52,7 @@ class DeliveryJobDetailScreen extends StatefulWidget {
 
 class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
   bool _applying = false;
+  int _paymentCtaVersion = 0;
   bool _justApplied = false;
 
   bool get _isSeller => widget.job.sellerId == widget.currentUid;
@@ -85,12 +90,20 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
     );
   }
 
-  Future<void> _applyToJob() async {
+  Future<void> _applyToJob({bool isReapply = false}) async {
+    final paymentDetails = await DeliveryApplyPaymentSheet.show(
+      context,
+      driverId: widget.currentUid,
+      isReapply: isReapply,
+    );
+    if (paymentDetails == null || !mounted) return;
+
     setState(() => _applying = true);
     try {
       await context.read<DeliveryProvider>().applyToJob(
             widget.job.id,
             widget.currentUid,
+            paymentDetails: paymentDetails,
           );
       if (mounted) setState(() => _justApplied = true);
     } catch (e) {
@@ -446,7 +459,7 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                 ),
               ],
 
-              // ── Seller view: Mark completed button ──
+              // ── Seller view: Pay driver ──
               if (_isSeller && job.jobStatus == DeliveryJobStatuses.awaitingPayment) ...[
                 const SizedBox(height: 16),
                 Container(
@@ -469,7 +482,7 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'The proof was approved. Once you have settled payment with the driver, please mark the job as completed.',
+                        'The proof was approved. Pay the driver, then wait for them to confirm receipt and complete the job.',
                         style: TextStyle(
                           fontSize: 13,
                           color: _kTextSecondary,
@@ -481,41 +494,19 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                         height: 48,
                         child: FilledButton(
                           style: FilledButton.styleFrom(
-                            backgroundColor: _kPurple,
+                            backgroundColor: _kGreen,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          onPressed: () async {
-                            final deliveryProvider = context.read<DeliveryProvider>();
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                                title: const Text('Complete Job'),
-                                content: const Text(
-                                    'Are you sure you want to mark this job as completed?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx, true),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: _kPurple,
-                                    ),
-                                    child: const Text('Complete'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) {
-                              await deliveryProvider.completeJob(job.id);
-                            }
-                          },
-                          child: const Text('Mark as Completed'),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  DeliveryPaymentScreen(jobId: job.id),
+                            ),
+                          ),
+                          child: const Text('Pay Driver'),
                         ),
                       ),
                     ],
@@ -644,7 +635,12 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              onPressed: (enabled && !_applying) ? _applyToJob : null,
+                              onPressed: (enabled && !_applying)
+                                  ? () => _applyToJob(
+                                        isReapply: effectiveStatus ==
+                                            DeliveryApplicationStatuses.rejected,
+                                      )
+                                  : null,
                               child: _applying
                                   ? const SizedBox(
                                       height: 20,
@@ -712,6 +708,89 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
   }
 
   Widget _buildAssignedDriverCTA(BuildContext context, DeliveryJobModel job) {
+    if (job.jobStatus == DeliveryJobStatuses.awaitingPayment) {
+      return FutureBuilder<DeliveryPaymentModel?>(
+        key: ValueKey(_paymentCtaVersion),
+        future: DeliveryPaymentService().getPayment(job.id),
+        builder: (context, snapshot) {
+          final payment = snapshot.data;
+          String label;
+          Color btnColor;
+          bool enabled;
+          VoidCallback? onPressed;
+
+          if (payment == null || !payment.isSettled) {
+            label = 'View Payment Status';
+            btnColor = const Color(0xFFF59E0B);
+            enabled = true;
+            onPressed = () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DeliveryPaymentScreen(jobId: job.id),
+                ),
+              );
+              if (mounted) setState(() => _paymentCtaVersion++);
+            };
+          } else if (!payment.driverConfirmedPayment) {
+            label = 'Confirm Payment Received';
+            btnColor = _kGreen;
+            enabled = true;
+            onPressed = () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DeliveryPaymentScreen(jobId: job.id),
+                ),
+              );
+              if (mounted) setState(() => _paymentCtaVersion++);
+            };
+          } else {
+            label = 'Complete Job';
+            btnColor = _kGreen;
+            enabled = true;
+            onPressed = () async {
+              final deliveryProvider = context.read<DeliveryProvider>();
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  title: const Text('Complete Job'),
+                  content: const Text(
+                    'Mark this delivery job as completed?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: TextButton.styleFrom(foregroundColor: _kGreen),
+                      child: const Text('Complete'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await deliveryProvider.completeJob(job.id);
+              }
+            };
+          }
+
+          return _driverCtaShell(
+            context,
+            label: label,
+            btnColor: btnColor,
+            enabled: enabled,
+            onPressed: onPressed,
+          );
+        },
+      );
+    }
+
     String label;
     Color btnColor;
     bool enabled;
@@ -759,11 +838,6 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
         btnColor = const Color(0xFFF59E0B);
         enabled = false;
         break;
-      case DeliveryJobStatuses.awaitingPayment:
-        label = 'Awaiting Payment';
-        btnColor = const Color(0xFFF59E0B);
-        enabled = false;
-        break;
       case DeliveryJobStatuses.completed:
         label = '✓ Delivery Completed';
         btnColor = _kGreen;
@@ -780,6 +854,22 @@ class _DeliveryJobDetailScreenState extends State<DeliveryJobDetailScreen> {
         enabled = false;
     }
 
+    return _driverCtaShell(
+      context,
+      label: label,
+      btnColor: btnColor,
+      enabled: enabled,
+      onPressed: onPressed,
+    );
+  }
+
+  Widget _driverCtaShell(
+    BuildContext context, {
+    required String label,
+    required Color btnColor,
+    required bool enabled,
+    required VoidCallback? onPressed,
+  }) {
     return Container(
       padding: EdgeInsets.fromLTRB(
         16,
@@ -1013,7 +1103,15 @@ class _SubmitProofDialogState extends State<_SubmitProofDialog> {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text('Submit Delivery Proof'),
-      content: Column(
+      // AlertDialog wraps `content` in an IntrinsicWidth internally so it can
+      // size itself to fit. IntrinsicWidth cannot measure widgets that report
+      // an infinite/unbounded intrinsic size — Expanded is exactly that kind
+      // of widget, which is what threw 'input.isFinite': is not true. Giving
+      // content a fixed width here gives the Row/Expanded below a real,
+      // finite constraint to expand into, instead of an undefined one.
+      content: SizedBox(
+        width: 280,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
@@ -1072,6 +1170,7 @@ class _SubmitProofDialogState extends State<_SubmitProofDialog> {
               ),
             ),
         ],
+        ),
       ),
       actions: [
         TextButton(

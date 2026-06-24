@@ -108,7 +108,25 @@ export const copyPayeeBankDetails = onCall(async (request) => {
   }
 
   const bankDoc = await db.collection('bank_details').doc(payeeId).get();
-  const bankData = bankDoc.exists ? bankDoc.data() : null;
+  let bankData = bankDoc.exists ? bankDoc.data() : null;
+
+  if (!bankData) {
+    const userDoc = await db.collection('users').doc(payeeId).get();
+    const userData = userDoc.data();
+    const legacyBankDetails = userData?.bankDetails as
+      | Record<string, unknown>
+      | undefined;
+    if (legacyBankDetails) {
+      bankData = legacyBankDetails;
+    } else {
+      const legacyQr =
+        (userData?.qr_code_url as string | undefined) ??
+        (userData?.qrCodeUrl as string | undefined);
+      if (legacyQr) {
+        bankData = {qrCodeUrl: legacyQr};
+      }
+    }
+  }
 
   await paymentRef.update({
     payee_bank_snapshot: bankData

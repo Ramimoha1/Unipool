@@ -1,12 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:unipool/core/constants.dart';
 import '../models/delivery_proof_model.dart';
+import 'delivery_payment_service.dart';
 
 class DeliveryProofService {
-  DeliveryProofService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  DeliveryProofService({
+    FirebaseFirestore? firestore,
+    DeliveryPaymentService? paymentService,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _paymentService = paymentService ?? DeliveryPaymentService();
 
   final FirebaseFirestore _firestore;
+  final DeliveryPaymentService _paymentService;
 
   CollectionReference<Map<String, dynamic>> _proofs(String jobId) {
     return _firestore
@@ -66,7 +71,7 @@ class DeliveryProofService {
         AppFields.reviewedAt: Timestamp.now(),
       });
 
-      // If approved, update the job status
+      // If approved, update the job status and trigger payment
       if (status == DeliveryProofStatuses.approved) {
         await _firestore
             .collection(AppCollections.deliveryJobs)
@@ -75,6 +80,7 @@ class DeliveryProofService {
           AppFields.jobStatus: DeliveryJobStatuses.awaitingPayment,
           AppFields.updatedAt: Timestamp.now(),
         });
+        await _paymentService.triggerPayment(jobId);
       }
     } catch (error) {
       throw Exception('Failed to review delivery proof: $error');

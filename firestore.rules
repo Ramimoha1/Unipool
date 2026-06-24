@@ -24,6 +24,10 @@ service cloud.firestore {
         && groupDoc(requestId).data.member_ids.hasAny([request.auth.uid]);
     }
 
+    function deliveryJobDoc(jobId) {
+      return get(/databases/$(database)/documents/delivery_jobs/$(jobId));
+    }
+
     match /users/{userId} {
       // App flows need user profile reads (self and peers) plus self profile writes.
       // Admin keeps full access for moderation dashboards.
@@ -165,6 +169,24 @@ service cloud.firestore {
         allow read, create, update: if isSignedIn();
         allow delete: if false;
       }
+    }
+
+    match /delivery_payments/{paymentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        deliveryJobDoc(request.resource.data.job_id).data.seller_id == request.auth.uid
+      );
+      allow update: if isSignedIn() && (
+        deliveryJobDoc(resource.data.job_id).data.seller_id == request.auth.uid ||
+        (
+          deliveryJobDoc(resource.data.job_id).data.assigned_driver_id == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['driver_confirmed_at']) &&
+          resource.data.status == 'settled' &&
+          resource.data.payment_proof_url is string &&
+          resource.data.payment_proof_url.size() > 0
+        )
+      );
+      allow delete: if false;
     }
 
     match /delivery_disputes/{disputeId} {

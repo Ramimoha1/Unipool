@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:unipool/core/constants.dart';
+import 'package:unipool/features/profile/domain/bank_details_model.dart';
 
 class DeliveryApplicationModel {
   const DeliveryApplicationModel({
@@ -10,6 +11,7 @@ class DeliveryApplicationModel {
     required this.notes,
     required this.createdAt,
     required this.updatedAt,
+    this.paymentDetails = const BankDetailsModel(),
   });
 
   final String id;
@@ -19,6 +21,7 @@ class DeliveryApplicationModel {
   final String notes;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final BankDetailsModel paymentDetails;
 
   factory DeliveryApplicationModel.fromMap(
     Map<String, dynamic> map,
@@ -35,6 +38,9 @@ class DeliveryApplicationModel {
           (map[AppFields.createdAt] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt:
           (map[AppFields.updatedAt] as Timestamp?)?.toDate() ?? DateTime.now(),
+      paymentDetails: BankDetailsModel.fromMap(
+        map[AppFields.payeeBankSnapshot] as Map<String, dynamic>?,
+      ),
     );
   }
 
@@ -46,6 +52,8 @@ class DeliveryApplicationModel {
       AppFields.notes: notes,
       AppFields.createdAt: Timestamp.fromDate(createdAt),
       AppFields.updatedAt: Timestamp.fromDate(updatedAt),
+      if (paymentDetails.isNotEmpty)
+        AppFields.payeeBankSnapshot: paymentDetails.toMap(),
     };
   }
 
@@ -57,6 +65,7 @@ class DeliveryApplicationModel {
     String? notes,
     DateTime? createdAt,
     DateTime? updatedAt,
+    BankDetailsModel? paymentDetails,
   }) {
     return DeliveryApplicationModel(
       id: id ?? this.id,
@@ -66,6 +75,7 @@ class DeliveryApplicationModel {
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      paymentDetails: paymentDetails ?? this.paymentDetails,
     );
   }
 }

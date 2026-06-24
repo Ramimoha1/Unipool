@@ -40,6 +40,11 @@ service firebase.storage {
       allow read, write: if isSignedIn();
     }
 
+    match /delivery_payment_proofs/{jobId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
