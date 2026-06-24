@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
-import 'admin_login_screen.dart';
 
 /// Landing screen shown to unauthenticated users.
 /// Matches Figma Image 1: gradient background, UniPool branding,
@@ -14,7 +13,6 @@ class MainAuthenticationScreen extends StatelessWidget {
   static const Color _gradientMid = Color(0xFF5B72C8);    // periwinkle
   static const Color _gradientBot = Color(0xFF7C4DB8);    // purple
   static const Color _teal = Color(0xFF1A9B8A);
-  static const Color _adminPurple = Color(0xFF7C4DB8);
 
   @override
   Widget build(BuildContext context) {
@@ -116,19 +114,6 @@ class MainAuthenticationScreen extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                _PrimaryButton(
-                  label: 'Admin Login',
-                  textColor: Colors.white,
-                  backgroundColor: _adminPurple,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const AdminLoginScreen()),
                   ),
                 ),
 

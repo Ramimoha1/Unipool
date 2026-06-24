@@ -135,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Log in to your UniPool account',
+                  'Log in with your UniPool account',
                   style: TextStyle(color: _textMuted, fontSize: 14),
                 ),
                 const SizedBox(height: 36),

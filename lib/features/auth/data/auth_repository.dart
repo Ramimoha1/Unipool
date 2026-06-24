@@ -88,29 +88,6 @@ class AuthRepository {
     return credential.user!;
   }
 
-  /// Signs in as admin. Verifies the user has `'admin'` in their `roles` array in Firestore.
-  Future<User> signInAsAdmin({
-    required String email,
-    required String password,
-  }) async {
-    final credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
-    final user = credential.user!;
-
-    // Verify admin role in Firestore
-    final doc = await _firestore.collection('users').doc(user.uid).get();
-    final data = doc.data();
-    final roles = (data?['roles'] as List<dynamic>?)?.cast<String>() ?? [];
-    if (data == null || !roles.contains('admin')) {
-      await _auth.signOut();
-      throw Exception('Access denied. This account does not have admin privileges.');
-    }
-
-    return user;
-  }
-
   // ─── Password Reset ───────────────────────────────────────────────────────
 
   Future<void> sendPasswordResetEmail(String email) async {
@@ -126,8 +103,19 @@ class AuthRepository {
   /// Returns the roles list for the given uid from Firestore.
   Future<List<String>> getUserRoles(String uid) async {
     final doc = await _firestore.collection('users').doc(uid).get();
-    final roles = (doc.data()?['roles'] as List<dynamic>?)?.cast<String>() ?? [];
+    final data = doc.data();
+    final roles = (data?['roles'] as List<dynamic>?)?.cast<String>() ?? [];
     return roles;
+  }
+
+  /// Whether this user should see the admin dashboard after sign-in.
+  Future<bool> isAdmin(String uid) async {
+    final doc = await _firestore.collection('users').doc(uid).get();
+    final data = doc.data();
+    if (data == null) return false;
+    final roles = (data['roles'] as List<dynamic>?)?.cast<String>() ?? [];
+    if (roles.contains('admin')) return true;
+    return data['userType'] == 'admin';
   }
 
   // ─── Private Helpers ──────────────────────────────────────────────────────
