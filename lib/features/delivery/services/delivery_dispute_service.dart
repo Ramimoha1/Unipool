@@ -117,4 +117,23 @@ class DeliveryDisputeService {
       throw Exception('Failed to resolve delivery dispute: $error');
     }
   }
+
+  /// Streams all open delivery disputes for the admin dashboard.
+  Stream<List<DeliveryDisputeModel>> getOpenDisputesStream() {
+    try {
+      return _disputes
+          .where(AppFields.status, isEqualTo: DeliveryDisputeStatuses.open)
+          .snapshots()
+          .map((snapshot) {
+        final disputes = snapshot.docs
+            .map((doc) => DeliveryDisputeModel.fromMap(doc.data(), doc.id))
+            .toList();
+        // Sort in memory to avoid needing a Firestore composite index
+        disputes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return disputes;
+      });
+    } catch (error) {
+      throw Exception('Failed to stream open delivery disputes: $error');
+    }
+  }
 }
