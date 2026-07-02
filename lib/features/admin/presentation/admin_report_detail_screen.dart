@@ -42,16 +42,161 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
     });
   }
 
-  Future<void> _banUser(String banType, {DateTime? expiryDate}) async {
+  Future<void> _banUser(String banType, String reason, {DateTime? expiryDate}) async {
     final adminUid = FirebaseAuth.instance.currentUser?.uid ?? 'admin';
     await FirebaseFirestore.instance.collection(AppCollections.users).doc(widget.report.targetUserId).update({
+      'isBanned': true,
+      'isActive': false,
+      'banType': banType,
       AppFields.userBannedStatus: banType,
-      AppFields.userBannedReason: 'Violated terms: ${widget.report.reason}',
-      AppFields.userBannedUntil: expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
+      AppFields.userBannedReason: reason,
+      'banReason': reason,
+      'banExpiresAt': expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
       'bannedAt': FieldValue.serverTimestamp(),
       'bannedBy': adminUid,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  void _showBanDialog(BuildContext context) {
+    final reasonCtrl = TextEditingController(text: 'Violated terms: ${widget.report.reason}');
+    String selectedBanType = 'temporary';
+    DateTime? expiryDate = DateTime.now().add(const Duration(days: 3));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Accept Report & Ban User', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Ban Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: selectedBanType,
+                  items: const [
+                    DropdownMenuItem(value: 'temporary', child: Text('Temporary Suspension')),
+                    DropdownMenuItem(value: 'until_payment', child: Text('Suspend until Payment')),
+                    DropdownMenuItem(value: 'permanent', child: Text('Permanent Ban')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDlgState(() {
+                        selectedBanType = val;
+                        if (val == 'temporary') {
+                          expiryDate ??= DateTime.now().add(const Duration(days: 3));
+                        } else {
+                          expiryDate = null;
+                        }
+                      });
+                    }
+                  },
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Reason *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: reasonCtrl,
+                  maxLines: 3,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Describe the violation…',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+                if (selectedBanType == 'temporary') ...[
+                  const SizedBox(height: 16),
+                  const Text('Suspension ends on *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: expiryDate ?? DateTime.now().add(const Duration(days: 3)),
+                        firstDate: DateTime.now().add(const Duration(days: 1)),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) {
+                        setDlgState(() => expiryDate = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFD1D5DB)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF6B7280)),
+                          const SizedBox(width: 10),
+                          Text(
+                            expiryDate != null
+                                ? '${expiryDate!.year}-${expiryDate!.month.toString().padLeft(2, '0')}-${expiryDate!.day.toString().padLeft(2, '0')}'
+                                : 'Pick a date',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final reason = reasonCtrl.text.trim();
+                if (reason.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please provide a reason.')));
+                  return;
+                }
+                if (selectedBanType == 'temporary' && expiryDate == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please pick an expiry date.')));
+                  return;
+                }
+                Navigator.pop(ctx);
+                
+                setState(() => _isProcessing = true);
+                try {
+                  await _banUser(selectedBanType, reason, expiryDate: expiryDate);
+                  await _updateReportStatus('accepted');
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User banned successfully.')));
+                    Navigator.pop(context);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    setState(() => _isProcessing = false);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD32F2F),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Apply Ban'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _handleAction(String action) async {
@@ -59,17 +204,10 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
     try {
       if (action == 'reject') {
         await _updateReportStatus('rejected');
-      } else if (action == 'ban_temp') {
-        final expiry = DateTime.now().add(const Duration(days: 3));
-        await _banUser('temporary', expiryDate: expiry);
-        await _updateReportStatus('accepted');
-      } else if (action == 'ban_payment') {
-        await _banUser('until_payment');
-        await _updateReportStatus('accepted');
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Action applied successfully.')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report rejected successfully.')));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -194,17 +332,10 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: Colors.orange),
-                  onPressed: () => _handleAction('ban_temp'),
-                  icon: const Icon(Icons.timer_off),
-                  label: const Text('Accept & Ban Temporarily (3 Days)'),
-                ),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                  onPressed: () => _handleAction('ban_payment'),
-                  icon: const Icon(Icons.money_off),
-                  label: const Text('Accept & Ban Until Payment'),
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD32F2F)),
+                  onPressed: () => _showBanDialog(context),
+                  icon: const Icon(Icons.block),
+                  label: const Text('Accept & Ban User'),
                 ),
                 const SizedBox(height: 24),
               ],

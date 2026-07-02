@@ -11,12 +11,20 @@ class PaymentProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
 
-  Future<void> triggerPayment(String requestId) async {
+  Future<void> triggerPayment(
+    String requestId, {
+    double totalAmount = 0.0,
+    double splitAmount = 0.0,
+  }) async {
     isLoading = true;
     error = null;
     notifyListeners();
     try {
-      await _service.triggerPayment(requestId);
+      await _service.triggerPayment(
+        requestId,
+        totalAmount: totalAmount,
+        splitAmount: splitAmount,
+      );
       currentPayment = await _service.getPayment(requestId);
     } catch (exception) {
       error = exception.toString();

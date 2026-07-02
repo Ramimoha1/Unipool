@@ -75,7 +75,7 @@ exports.onRideCompleted = (0, firestore_1.onDocumentUpdated)('carpool_requests/{
     const memberIds = groupDoc.get('member_ids') ?? [];
     await Promise.all(memberIds.map((memberId) => sendPushToUser(memberId, 'Payment pending', 'Your carpool ride is complete. Please settle payment.')));
 });
-exports.sendFCMNotification = (0, https_1.onCall)(async (request) => {
+exports.sendFCMNotification = (0, https_1.onCall)({ invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Authentication required.');
     }
@@ -94,7 +94,7 @@ exports.sendFCMNotification = (0, https_1.onCall)(async (request) => {
 // client never reads bank_details/{otherUid} directly; it calls this
 // function instead, right after creating a payment document.
 const ALLOWED_PAYMENT_COLLECTIONS = ['ride_payments', 'delivery_payments'];
-exports.copyPayeeBankDetails = (0, https_1.onCall)(async (request) => {
+exports.copyPayeeBankDetails = (0, https_1.onCall)({ invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Authentication required.');
     }
@@ -117,13 +117,13 @@ exports.copyPayeeBankDetails = (0, https_1.onCall)(async (request) => {
     if (!bankData) {
         const userDoc = await db.collection('users').doc(payeeId).get();
         const userData = userDoc.data();
-        const legacyBankDetails = userData === null || userData === void 0 ? void 0 : userData.bankDetails;
+        const legacyBankDetails = userData?.bankDetails;
         if (legacyBankDetails) {
             bankData = legacyBankDetails;
         }
         else {
-            const legacyQr = (userData === null || userData === void 0 ? void 0 : userData.qr_code_url) ??
-                (userData === null || userData === void 0 ? void 0 : userData.qrCodeUrl);
+            const legacyQr = userData?.qr_code_url ??
+                userData?.qrCodeUrl;
             if (legacyQr) {
                 bankData = { qrCodeUrl: legacyQr };
             }

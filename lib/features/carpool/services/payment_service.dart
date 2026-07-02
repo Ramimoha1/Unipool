@@ -29,7 +29,11 @@ class PaymentService {
       _firestore.collection(AppCollections.carpoolGroups);
 
   /// Creates a payment document for a completed carpool group.
-  Future<void> triggerPayment(String requestId) async {
+  Future<void> triggerPayment(
+    String requestId, {
+    double totalAmount = 0.0,
+    double splitAmount = 0.0,
+  }) async {
     try {
       final requestDoc = await _requests.doc(requestId).get();
       if (!requestDoc.exists) {
@@ -44,19 +48,20 @@ class PaymentService {
       }
 
       final currentUid = _auth.currentUser!.uid;
-      if (requestData[AppFields.creatorId] != currentUid) {
-        throw Exception('Only the request creator can trigger payment.');
-      }
 
-      final groupQuery = await _groups
-          .where(AppFields.requestId, isEqualTo: requestId)
-          .limit(1)
-          .get();
-      if (groupQuery.docs.isEmpty) {
+      final groupDoc = await _groups.doc(requestId).get();
+      if (!groupDoc.exists || groupDoc.data() == null) {
         throw Exception('Carpool group not found.');
       }
 
-      final group = groupQuery.docs.first.data();
+      final group = groupDoc.data()!;
+      final isCreator = requestData[AppFields.creatorId] == currentUid;
+      final isDriver = group[AppFields.driverId] == currentUid;
+
+      if (!isCreator && !isDriver) {
+        throw Exception('Only the request creator or driver can trigger payment.');
+      }
+
       final members = (group[AppFields.memberIds] as List<dynamic>? ?? const [])
           .map((value) => value.toString())
           .toList();
@@ -71,8 +76,8 @@ class PaymentService {
         requestId: requestId,
         bookedByUserId: bookedByUserId,
         qrCodeUrl: '', // filled in below by copyPayeeBankDetails
-        totalAmount: 0,
-        splitAmount: 0,
+        totalAmount: totalAmount,
+        splitAmount: splitAmount,
         status: CarpoolPaymentStatuses.pending,
         confirmedBy: const [],
         createdAt: DateTime.now(),
@@ -83,20 +88,29 @@ class PaymentService {
       // (see bank_details_repository.dart). The client never reads
       // another user's bank details directly — this Cloud Function
       // does it server-side and copies a snapshot onto the payment doc.
-      await _functions
-          .httpsCallable(FirebaseFunctionNames.copyPayeeBankDetails)
-          .call(<String, dynamic>{
-            'payeeId': bookedByUserId,
-            'paymentCollection': AppCollections.ridePayments,
-            'paymentId': paymentRef.id,
-          });
+      // This is non-fatal: if it fails the payment still proceeds.
+      try {
+        await _functions
+            .httpsCallable(FirebaseFunctionNames.copyPayeeBankDetails)
+            .call(<String, dynamic>{
+              'payeeId': bookedByUserId,
+              'paymentCollection': AppCollections.ridePayments,
+              'paymentId': paymentRef.id,
+            });
+      } catch (_) {
+        // Ignore — bank snapshot is cosmetic and can be retried later.
+      }
 
       for (final memberId in members) {
-        await _notificationService.sendFCMToUser(
-          memberId,
-          'Payment ready',
-          'A carpool payment is ready for your group.',
-        );
+        try {
+          await _notificationService.sendFCMToUser(
+            memberId,
+            'Payment ready',
+            'A carpool payment is ready for your group.',
+          );
+        } catch (_) {
+          // Ignore notification failures — payment was still created.
+        }
       }
     } catch (error) {
       throw Exception('Failed to trigger payment: $error');

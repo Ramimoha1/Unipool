@@ -61,14 +61,21 @@ class _EndRideSplitDialogState extends State<EndRideSplitDialog> {
     
     setState(() => _saving = true);
     try {
-      final payment = await paymentService.getPayment(widget.request.id);
-      if (payment == null) {
-        throw Exception('Payment has not been initialized for this request.');
+      double splitAmount = 0.0;
+      int numberOfMembers = widget.group.memberIds.length;
+      if (_splitType == 'equally_without_me') {
+        int passengersCount = numberOfMembers > 1 ? numberOfMembers - 1 : 1;
+        splitAmount = total / passengersCount;
+      } else {
+        // Fallback for 'equally' and 'manual'
+        splitAmount = total / numberOfMembers;
       }
-      
+
       if (!mounted) return;
       await context.read<PaymentProvider>().triggerPayment(
         widget.request.id,
+        totalAmount: total,
+        splitAmount: splitAmount,
       );
 
       if (mounted) {
