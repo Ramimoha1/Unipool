@@ -32,8 +32,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icons/unipool_logo.png"
+  adaptive_icon_background: "#1A9B8A"
+  adaptive_icon_foreground: "assets/icons/unipool_logo.png"
 
 flutter:
   uses-material-design: true
   assets:
     - .env
+    - assets/icons/
