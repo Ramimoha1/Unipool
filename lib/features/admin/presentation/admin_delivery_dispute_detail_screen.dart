@@ -97,22 +97,171 @@ class _AdminDeliveryDisputeDetailScreenState
     }
   }
 
-  Future<void> _banUser(String userId, String banType,
+  Future<void> _banUser(String userId, String banType, String reason,
       {DateTime? expiryDate}) async {
     final adminUid = FirebaseAuth.instance.currentUser?.uid ?? 'admin';
     await FirebaseFirestore.instance
         .collection(AppCollections.users)
         .doc(userId)
         .update({
+      'isBanned': true,
+      'isActive': false,
+      'banType': banType,
       AppFields.userBannedStatus: banType,
-      AppFields.userBannedReason:
-          'Violated terms in delivery job dispute: ${widget.dispute.reason}',
-      AppFields.userBannedUntil:
+      AppFields.userBannedReason: reason,
+      'banReason': reason,
+      'banExpiresAt':
           expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
       'bannedAt': FieldValue.serverTimestamp(),
       'bannedBy': adminUid,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  void _showBanDialog(BuildContext context) {
+    final reasonCtrl = TextEditingController(text: 'Violated terms in delivery job dispute: ${widget.dispute.reason}');
+    String selectedBanType = 'temporary';
+    DateTime? expiryDate = DateTime.now().add(const Duration(days: 3));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Accept & Ban Accused User', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Ban Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: selectedBanType,
+                  items: const [
+                    DropdownMenuItem(value: 'temporary', child: Text('Temporary Suspension')),
+                    DropdownMenuItem(value: 'until_payment', child: Text('Suspend until Payment')),
+                    DropdownMenuItem(value: 'permanent', child: Text('Permanent Ban')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDlgState(() {
+                        selectedBanType = val;
+                        if (val == 'temporary') {
+                          expiryDate ??= DateTime.now().add(const Duration(days: 3));
+                        } else {
+                          expiryDate = null;
+                        }
+                      });
+                    }
+                  },
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Reason *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: reasonCtrl,
+                  maxLines: 3,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Describe the violation…',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+                if (selectedBanType == 'temporary') ...[
+                  const SizedBox(height: 16),
+                  const Text('Suspension ends on *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: expiryDate ?? DateTime.now().add(const Duration(days: 3)),
+                        firstDate: DateTime.now().add(const Duration(days: 1)),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) {
+                        setDlgState(() => expiryDate = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFD1D5DB)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF6B7280)),
+                          const SizedBox(width: 10),
+                          Text(
+                            expiryDate != null
+                                ? '${expiryDate!.year}-${expiryDate!.month.toString().padLeft(2, '0')}-${expiryDate!.day.toString().padLeft(2, '0')}'
+                                : 'Pick a date',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final reason = reasonCtrl.text.trim();
+                if (reason.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please provide a reason.')));
+                  return;
+                }
+                if (selectedBanType == 'temporary' && expiryDate == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please pick an expiry date.')));
+                  return;
+                }
+                Navigator.pop(ctx);
+                
+                setState(() => _isProcessing = true);
+                try {
+                  final adminUid = FirebaseAuth.instance.currentUser?.uid ?? 'admin';
+                  await _banUser(_accusedId, selectedBanType, reason, expiryDate: expiryDate);
+                  await DeliveryDisputeService().resolveDispute(
+                    disputeId: widget.dispute.id,
+                    jobId: widget.dispute.jobId,
+                    reviewerId: adminUid,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User banned successfully.')));
+                    Navigator.pop(context);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    setState(() => _isProcessing = false);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD32F2F),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Apply Ban'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _handleAction(String action) async {
@@ -129,23 +278,6 @@ class _AdminDeliveryDisputeDetailScreenState
         );
       } else if (action == 'reject') {
         // Rejecting a dispute also resolves it and restores the job status
-        await DeliveryDisputeService().resolveDispute(
-          disputeId: widget.dispute.id,
-          jobId: widget.dispute.jobId,
-          reviewerId: adminUid,
-        );
-      } else if (action == 'ban_temp') {
-        // Ban accused temporarily for 3 days, resolve dispute & restore job
-        final expiry = DateTime.now().add(const Duration(days: 3));
-        await _banUser(_accusedId, 'temporary', expiryDate: expiry);
-        await DeliveryDisputeService().resolveDispute(
-          disputeId: widget.dispute.id,
-          jobId: widget.dispute.jobId,
-          reviewerId: adminUid,
-        );
-      } else if (action == 'ban_payment') {
-        // Ban accused until payment, resolve dispute & restore job
-        await _banUser(_accusedId, 'until_payment');
         await DeliveryDisputeService().resolveDispute(
           disputeId: widget.dispute.id,
           jobId: widget.dispute.jobId,
@@ -407,20 +539,6 @@ class _AdminDeliveryDisputeDetailScreenState
                 const SizedBox(height: 8),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onPressed: () => _handleAction('ban_temp'),
-                  icon: const Icon(Icons.timer_off_outlined),
-                  label: const Text('Accept & Ban Accused User (3 Days)'),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
                     backgroundColor: red,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -428,9 +546,9 @@ class _AdminDeliveryDisputeDetailScreenState
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: () => _handleAction('ban_payment'),
-                  icon: const Icon(Icons.money_off_rounded),
-                  label: const Text('Accept & Ban Accused User (Until Paid)'),
+                  onPressed: () => _showBanDialog(context),
+                  icon: const Icon(Icons.block),
+                  label: const Text('Accept & Ban Accused User'),
                 ),
                 const SizedBox(height: 24),
               ],

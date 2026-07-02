@@ -57,7 +57,7 @@ export const onRideCompleted = onDocumentUpdated('carpool_requests/{requestId}',
   );
 });
 
-export const sendFCMNotification = onCall(async (request) => {
+export const sendFCMNotification = onCall({ invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }
@@ -81,7 +81,7 @@ export const sendFCMNotification = onCall(async (request) => {
 // function instead, right after creating a payment document.
 const ALLOWED_PAYMENT_COLLECTIONS = ['ride_payments', 'delivery_payments'];
 
-export const copyPayeeBankDetails = onCall(async (request) => {
+export const copyPayeeBankDetails = onCall({ invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }
