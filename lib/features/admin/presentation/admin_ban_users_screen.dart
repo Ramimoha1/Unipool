@@ -134,14 +134,35 @@ class _UserList extends StatelessWidget {
   final String query;
   final bool showBannedOnly;
 
+  /// Returns true if the user document represents an actively banned user.
+  static bool _isActiveBan(Map<String, dynamic> data) {
+    // Check the isBanned flag
+    if (data['isBanned'] == true) {
+      // For temporary bans, check if expired
+      final expiresAt = (data['banExpiresAt'] as Timestamp?)?.toDate();
+      if (expiresAt != null && expiresAt.isBefore(DateTime.now())) {
+        return false; // expired temp ban
+      }
+      return true;
+    }
+    // Also check bannedStatus (written by dispute screens)
+    final status = data['bannedStatus'] as String?;
+    if (status != null && status != 'none' && status.isNotEmpty) {
+      final expiresAt = (data['banExpiresAt'] as Timestamp?)?.toDate();
+      if (expiresAt != null && expiresAt.isBefore(DateTime.now())) {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Always fetch all users — we filter client-side for the Banned tab
+    // because banned users may have isBanned OR bannedStatus set.
     Query<Map<String, dynamic>> q =
         FirebaseFirestore.instance.collection('users');
-
-    if (showBannedOnly) {
-      q = q.where('isBanned', isEqualTo: true);
-    }
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: q.orderBy('fullName').snapshots(),
@@ -173,6 +194,11 @@ class _UserList extends StatelessWidget {
               return !roles.contains('admin');
             })
             .toList();
+
+        // For the Banned tab, filter to only actively banned users
+        if (showBannedOnly) {
+          docs = docs.where((d) => _isActiveBan(d.data())).toList();
+        }
 
         if (docs.isEmpty) {
           return Center(
@@ -224,10 +250,37 @@ class _UserCard extends StatelessWidget {
 
   Map<String, dynamic> get data => doc.data();
 
-  bool get isBanned => data['isBanned'] as bool? ?? false;
-  String get banType => data['banType'] as String? ?? 'permanent';
+  bool get isBanned => _UserList._isActiveBan(data);
+  String get banType {
+    final bt = data['banType'] as String?;
+    if (bt != null && bt.isNotEmpty) return bt;
+    final bs = data['bannedStatus'] as String?;
+    if (bs != null && bs != 'none' && bs.isNotEmpty) return bs;
+    return 'permanent';
+  }
   List<String> get roles =>
       (data['roles'] as List<dynamic>?)?.cast<String>() ?? ['student'];
+
+  String get _banReason {
+    final br = data['banReason'] as String?;
+    if (br != null && br.isNotEmpty) return br;
+    final bbr = data['bannedReason'] as String?; // from disputes
+    if (bbr != null && bbr.isNotEmpty) return bbr;
+    return '';
+  }
+
+  String _banTypeLabel(String type) {
+    switch (type) {
+      case 'permanent':
+        return 'Permanently Banned';
+      case 'temporary':
+        return 'Temporarily Suspended';
+      case 'until_payment':
+        return 'Suspended (Awaiting Payment)';
+      default:
+        return 'Account Suspended';
+    }
+  }
 
   String _userTypeLabel() {
     if (roles.contains('verified_driver')) return 'Driver';
@@ -359,9 +412,7 @@ class _UserCard extends StatelessWidget {
                             size: 14, color: Color(0xFFD32F2F)),
                         const SizedBox(width: 6),
                         Text(
-                          banType == 'permanent'
-                              ? 'Permanently Banned'
-                              : 'Temporarily Suspended',
+                          _banTypeLabel(banType),
                           style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
@@ -369,11 +420,10 @@ class _UserCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (data['banReason'] != null &&
-                        (data['banReason'] as String).isNotEmpty) ...[
+                    if (_banReason.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Reason: ${data['banReason']}',
+                        'Reason: $_banReason',
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF6B7280)),
                       ),
@@ -680,6 +730,8 @@ class _UserCard extends StatelessWidget {
         'isActive': false,
         'banType': isTemporary ? 'temporary' : 'permanent',
         'banReason': reason,
+        'bannedStatus': isTemporary ? 'temporary' : 'permanent',
+        'bannedReason': reason,
         'bannedAt': FieldValue.serverTimestamp(),
         'banExpiresAt': expiryDate != null
             ? Timestamp.fromDate(expiryDate)
@@ -756,8 +808,11 @@ class _UserCard extends StatelessWidget {
         'isActive': true,
         'banType': FieldValue.delete(),
         'banReason': FieldValue.delete(),
+        'bannedStatus': FieldValue.delete(),
+        'bannedReason': FieldValue.delete(),
         'bannedAt': FieldValue.delete(),
         'banExpiresAt': FieldValue.delete(),
+        'bannedUntil': FieldValue.delete(),
         'bannedBy': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       });

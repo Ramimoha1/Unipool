@@ -109,10 +109,7 @@ service cloud.firestore {
 
     match /ride_payments/{paymentId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && (
-        requestDoc(request.resource.data.request_id).data.creator_id == request.auth.uid ||
-        groupDoc(request.resource.data.request_id).data.driver_id == request.auth.uid
-      );
+      allow create: if isSignedIn() && isGroupMember(request.resource.data.request_id);
       allow update: if isSignedIn() && (
         requestDoc(resource.data.request_id).data.creator_id == request.auth.uid ||
         groupDoc(resource.data.request_id).data.driver_id == request.auth.uid ||
